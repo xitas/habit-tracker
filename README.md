@@ -1,14 +1,58 @@
 # Habits
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A mobile habit tracker app for building and tracking daily habits: simple to log, works offline, and keeps your data on your phone.
+
+<p align="center">
+  <img src="./screenshots/today-light.png" width="250" alt="Today screen in light mode" />
+  &nbsp;&nbsp;
+  <img src="./screenshots/today-dark.png" width="250" alt="Today screen in dark mode" />
+</p>
 
 ## Screenshots
 
-> Replace these placeholders with your own screenshots (put them in a `screenshots/` folder).
-
-| Today (light) | Today (dark) | Stats |
-| --- | --- | --- |
-| ![Today screen, light mode](./screenshots/today-light.png) | ![Today screen, dark mode](./screenshots/today-dark.png) | ![Stats screen](./screenshots/stats.png) |
+<table>
+  <tr>
+    <th>Light</th>
+    <th>Dark</th>
+  </tr>
+  <tr>
+    <td><img src="./screenshots/today-light.png" width="250" alt="Today screen, light mode" /></td>
+    <td><img src="./screenshots/today-dark.png" width="250" alt="Today screen, dark mode" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>Today: progress ring and habit cards (tap, +/−, or swipe to complete or skip)</em></td>
+  </tr>
+  <tr>
+    <td><img src="./screenshots/stats-light.png" width="250" alt="Stats screen, light mode" /></td>
+    <td><img src="./screenshots/stats-dark.png" width="250" alt="Stats screen, dark mode" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>Stats: weekly completion chart, streaks and monthly heatmap</em></td>
+  </tr>
+  <tr>
+    <td><img src="./screenshots/habit-detail-light.png" width="250" alt="Habit detail screen, light mode" /></td>
+    <td><img src="./screenshots/habit-detail-dark.png" width="250" alt="Habit detail screen, dark mode" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>Habit detail: streaks, completion rate, calendar (tap a day to backfill or add a note)</em></td>
+  </tr>
+  <tr>
+    <td><img src="./screenshots/add-habit-light.png" width="250" alt="New habit form, light mode" /></td>
+    <td><img src="./screenshots/add-habit-dark.png" width="250" alt="New habit form, dark mode" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>New habit: name, emoji, color, yes/no or measurable goal, frequency and reminder</em></td>
+  </tr>
+  <tr>
+    <td><img src="./screenshots/settings-light.png" width="250" alt="Settings screen, light mode" /></td>
+    <td><img src="./screenshots/settings-dark.png" width="250" alt="Settings screen, dark mode" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><em>Settings: Light / Dark / System theme, week start, reminders and data export</em></td>
+  </tr>
+</table>
 
 ## Features
 
@@ -195,6 +239,4 @@ Contributions are welcome!
 
 ## License
 
-Released under the [MIT License](./LICENSE).
-
-Copyright (c) 2026 [Your Name]
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
