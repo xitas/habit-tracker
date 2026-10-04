@@ -7,9 +7,10 @@ import { useEffect, useMemo } from 'react';
 import { Appearance, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { RecoveryScreen } from '@/components/RecoveryScreen';
 import { ThemeFade } from '@/components/ThemeFade';
 import { useNotificationSync } from '@/lib/notifications';
-import { hydrate, useHydrated, useStore } from '@/lib/store';
+import { hydrate, useHydrated, useLoadStatus, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 
 // Keep the (theme-aware) native splash up until saved data, including the
@@ -18,6 +19,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const hydrated = useHydrated();
+  const { status, busy } = useLoadStatus();
   const themePref = useStore((s) => s.settings.theme);
   const { c, isDark } = useTheme();
 
@@ -54,7 +56,18 @@ export default function RootLayout() {
     };
   }, [c, isDark]);
 
-  if (!hydrated) return <View style={{ flex: 1, backgroundColor: c.bg }} />;
+  // Saved data couldn't be loaded: show recovery instead of an empty app.
+  // It stays mounted while a recovery action reloads, so its messages survive.
+  if (status === 'error' || (status === 'loading' && busy)) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.bg }}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <RecoveryScreen />
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (status === 'loading') return <View style={{ flex: 1, backgroundColor: c.bg }} />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.bg }}>

@@ -83,7 +83,7 @@ A mobile habit tracker app for building and tracking daily habits: simple to log
 | Framework | [Expo](https://expo.dev) SDK 57, React Native 0.86, React 19 |
 | Language | TypeScript |
 | Navigation | Expo Router (file-based routing: bottom tabs + stack) |
-| Storage | `@react-native-async-storage/async-storage` (local only) |
+| Storage | `expo-sqlite` on phones (tables for habits, entries and settings); browser storage on web. Local only |
 | State | A small custom store built on React's `useSyncExternalStore` |
 | Animations and gestures | `react-native-reanimated`, `react-native-worklets`, `react-native-gesture-handler` |
 | Graphics | `react-native-svg` (progress ring), `@expo/vector-icons` (Ionicons) |
@@ -167,7 +167,7 @@ habit-tracker/
 
 ## Data Model
 
-All data is stored on the device as a single JSON document in AsyncStorage.
+All data is stored on the device: in a SQLite database on phones (`habits`, `entries` and `settings` tables, plus a `meta` table with the schema version), and in browser storage on web. After each successful launch, a last-known-good backup copy is saved separately. If saved data ever fails to load, the app shows a recovery screen instead of starting empty.
 
 **Habit**
 

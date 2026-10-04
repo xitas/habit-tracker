@@ -1,8 +1,5 @@
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
-
 import { frequencyLabel } from './schedule';
+import { shareTextFile } from './shareFile';
 import type { AppData } from './types';
 
 const cell = (v: unknown) => {
@@ -35,23 +32,10 @@ export function buildCsv(data: AppData): string {
 }
 
 export async function exportCsv(data: AppData): Promise<void> {
-  const csv = buildCsv(data);
   const name = `habits-${new Date().toISOString().slice(0, 10)}.csv`;
-
-  if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-    return;
-  }
-
-  const file = new File(Paths.cache, name);
-  if (file.exists) file.delete();
-  file.create();
-  file.write(csv);
-  if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device');
-  await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export habits', UTI: 'public.comma-separated-values-text' });
+  await shareTextFile(name, buildCsv(data), {
+    mimeType: 'text/csv',
+    uti: 'public.comma-separated-values-text',
+    dialogTitle: 'Export habits',
+  });
 }
