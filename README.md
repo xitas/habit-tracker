@@ -226,6 +226,7 @@ npx expo export --platform web
 
 ## Roadmap
 
+- 🔄 Background refresh of reminders, so they keep coming even if the app isn't opened for a few days
 - ☁️ Optional cloud sync and backup across devices
 - 📱 Home screen widgets for checking off habits
 - 🗂️ Habit categories and filtering

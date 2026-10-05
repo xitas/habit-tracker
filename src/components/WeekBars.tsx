@@ -5,7 +5,7 @@ import { addDays, formatLong, fromKey, startOfWeek, WEEKDAY_SHORT } from '@/lib/
 import { dayTally } from '@/lib/schedule';
 import { useTheme } from '@/lib/theme';
 import type { EntriesByHabit, Habit } from '@/lib/types';
-import { IconButton } from './ui';
+import { FONT_CAPS, IconButton } from './ui';
 
 const CHART_HEIGHT = 120;
 
@@ -87,6 +87,7 @@ export function WeekBars({
       <View style={styles.labels}>
         {days.map((d) => (
           <Text
+            maxFontSizeMultiplier={FONT_CAPS.grid}
             key={d}
             style={[styles.dayLabel, { color: d === today ? c.text : c.textMuted, fontWeight: d === today ? '800' : '600' }]}
           >

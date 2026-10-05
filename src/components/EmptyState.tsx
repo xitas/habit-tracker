@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { askForReminders } from '@/lib/notifications';
 import { addHabit, type HabitDraft } from '@/lib/store';
 import { alpha, HABIT_COLORS, radius, shadow, useTheme } from '@/lib/theme';
-import { Button } from './ui';
+import { Button, Emoji } from './ui';
 
 export const SUGGESTED_HABITS: (HabitDraft & { blurb: string })[] = [
   {
@@ -69,7 +69,7 @@ export function SuggestionList({ suggestions }: { suggestions: typeof SUGGESTED_
           ]}
         >
           <View style={[styles.icon, { backgroundColor: alpha(tag(draft.color), 0.15) }]}>
-            <Text style={{ fontSize: 24 }}>{draft.icon}</Text>
+            <Emoji size={24}>{draft.icon}</Emoji>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: c.text }]}>{draft.name}</Text>

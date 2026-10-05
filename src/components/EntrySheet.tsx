@@ -16,7 +16,7 @@ import { saveEntry } from '@/lib/store';
 import { alpha, radius, useTheme } from '@/lib/theme';
 import type { Entry, EntryStatus, Habit } from '@/lib/types';
 import { stepFor } from './HabitCard';
-import { Button, Chip, IconButton, useInputTheme } from './ui';
+import { Button, Chip, Emoji, FONT_CAPS, IconButton, useInputTheme, useLargeText } from './ui';
 
 type Props = {
   habit: Habit;
@@ -34,6 +34,7 @@ type Props = {
 export function EntrySheet({ habit, date, entry, isToday, onClose, onOpenHabit }: Props) {
   const { c, isDark, tag, tagInk } = useTheme();
   const inputTheme = useInputTheme();
+  const largeText = useLargeText();
   const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<EntryStatus>(entry?.status ?? 'missed');
   const [value, setValue] = useState(entry?.value ?? 0);
@@ -84,17 +85,23 @@ export function EntrySheet({ habit, date, entry, isToday, onClose, onOpenHabit }
           ]}
         >
           <View style={[styles.grabber, { backgroundColor: c.border }]} />
-          <View style={styles.headRow}>
-            <View style={[styles.icon, { backgroundColor: alpha(tag(habit.color), 0.15) }]}>
-              <Text style={{ fontSize: 22 }}>{habit.icon}</Text>
+          {/* Large text: icon and details button on their own row, so the title gets the full width. */}
+          <View style={[styles.headRow, largeText && styles.headStacked]}>
+            <View style={largeText ? styles.headTop : styles.headSide}>
+              <View style={[styles.icon, { backgroundColor: alpha(tag(habit.color), 0.15) }]}>
+                <Emoji size={22}>{habit.icon}</Emoji>
+              </View>
+              {largeText && onOpenHabit ? (
+                <IconButton name="stats-chart-outline" label="Open habit details" onPress={onOpenHabit} />
+              ) : null}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
+            <View style={largeText ? undefined : { flex: 1 }}>
+              <Text accessibilityRole="header" maxFontSizeMultiplier={FONT_CAPS.title} style={[styles.title, { color: c.text }]}>
                 {habit.name}
               </Text>
               <Text style={{ color: c.textMuted, fontSize: 14 }}>{isToday ? 'Today' : formatLong(date)}</Text>
             </View>
-            {onOpenHabit ? (
+            {!largeText && onOpenHabit ? (
               <IconButton name="stats-chart-outline" label="Open habit details" onPress={onOpenHabit} />
             ) : null}
           </View>
@@ -115,6 +122,7 @@ export function EntrySheet({ habit, date, entry, isToday, onClose, onOpenHabit }
                     }
                   }}
                   keyboardType="decimal-pad"
+                  maxFontSizeMultiplier={FONT_CAPS.field}
                   selectTextOnFocus
                   accessibilityLabel={`Value in ${habit.unit}`}
                   style={[styles.valueInput, { color: c.text }]}
@@ -134,7 +142,7 @@ export function EntrySheet({ habit, date, entry, isToday, onClose, onOpenHabit }
             </View>
           ) : null}
 
-          <View style={styles.chips}>
+          <View style={[styles.chips, largeText && styles.chipsStacked]}>
             {statusOptions.map((o) => (
               <Chip
                 key={o.value}
@@ -175,10 +183,15 @@ const styles = StyleSheet.create({
   },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3 },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headStacked: { flexDirection: 'column', alignItems: 'stretch' },
+  headTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headSide: {},
   icon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 19, fontWeight: '700' },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  valueInput: { fontSize: 40, fontWeight: '800', textAlign: 'center', minWidth: 120, padding: 0 },
+  // Full width of its column: a text field's built-in width would otherwise overflow the row.
+  valueInput: { alignSelf: 'stretch', minWidth: 0, fontSize: 40, fontWeight: '800', textAlign: 'center', padding: 0 },
   chips: { flexDirection: 'row', gap: 8 },
+  chipsStacked: { flexDirection: 'column' },
   note: { minHeight: 80, borderRadius: radius.md, padding: 14, fontSize: 15, textAlignVertical: 'top' },
 });

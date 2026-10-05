@@ -14,7 +14,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { alpha, radius, shadow, useTheme } from '@/lib/theme';
 import type { Entry, Habit } from '@/lib/types';
-import { IconButton, MIN_TOUCH } from './ui';
+import { Emoji, IconButton, MIN_TOUCH } from './ui';
 
 const SWIPE_THRESHOLD = 90;
 /** Presses landing this soon after a swipe belong to the swipe, not a tap. */
@@ -117,6 +117,7 @@ export const HabitCard = memo(function HabitCard({
 
   const progress = measurable ? Math.min(1, value / habit.target) : done ? 1 : 0;
   const a11yState = done ? 'done' : skipped ? 'skipped' : 'not done';
+  const progressText = `${value} / ${habit.target} ${habit.unit}`.trim();
 
   return (
     <View style={styles.wrap}>
@@ -136,16 +137,15 @@ export const HabitCard = memo(function HabitCard({
             onLongPress={() => !guard.blocks() && onLongPress(habit)}
             delayLongPress={350}
             accessibilityRole="button"
-            accessibilityLabel={`${habit.name}, ${a11yState}. ${subtitle}`}
+            accessibilityLabel={`${habit.name}, ${a11yState}. ${measurable ? `${progressText}. ` : ''}${subtitle}`}
             accessibilityHint="Swipe right to complete, left to skip. Long press for details and notes."
             style={styles.row}
           >
             <View style={[styles.icon, { backgroundColor: alpha(color, 0.15) }, skipped && { opacity: 0.5 }]}>
-              <Text style={styles.emoji}>{habit.icon}</Text>
+              <Emoji size={24}>{habit.icon}</Emoji>
             </View>
             <View style={styles.body}>
               <Text
-                numberOfLines={1}
                 style={[
                   styles.name,
                   { color: skipped ? c.textMuted : c.text },
@@ -154,26 +154,12 @@ export const HabitCard = memo(function HabitCard({
               >
                 {habit.name}
               </Text>
-              <Text numberOfLines={1} style={[styles.sub, { color: c.textMuted }]}>
+              <Text style={[styles.sub, { color: c.textMuted }]}>
                 {subtitle}
               </Text>
             </View>
 
-            {measurable && !skipped ? (
-              <View style={styles.stepper}>
-                <IconButton name="remove" label={`Decrease ${habit.name}`} onPress={() => onStep(habit, -stepFor(habit.target))} />
-                <Animated.View style={done ? popStyle : undefined}>
-                  <Text style={[styles.value, { color: c.text }]}>{value}</Text>
-                </Animated.View>
-                <IconButton
-                  name="add"
-                  label={`Increase ${habit.name}`}
-                  bg={alpha(color, 0.15)}
-                  color={tagInk(habit.color)}
-                  onPress={() => onStep(habit, stepFor(habit.target))}
-                />
-              </View>
-            ) : (
+            {measurable ? null : (
               <Animated.View
                 style={[
                   styles.check,
@@ -187,8 +173,31 @@ export const HabitCard = memo(function HabitCard({
             )}
           </Pressable>
           {measurable ? (
-            <View style={[styles.track, { backgroundColor: c.surfaceAlt }]}>
-              <View style={[styles.fill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+            // Second row: the full value and target always fit (they wrap rather than truncate),
+            // and the name above gets the card's full width.
+            <View style={styles.measureRow}>
+              {skipped ? null : (
+                <IconButton name="remove" label={`Decrease ${habit.name}`} onPress={() => onStep(habit, -stepFor(habit.target))} />
+              )}
+              <View style={styles.measureBody}>
+                <Animated.View style={done ? popStyle : undefined}>
+                  <Text style={[styles.progressText, { color: skipped ? c.textMuted : c.text }]}>
+                    <Text style={styles.progressValue}>{value}</Text> / {habit.target} {habit.unit}
+                  </Text>
+                </Animated.View>
+                <View style={[styles.track, { backgroundColor: c.surfaceAlt }]}>
+                  <View style={[styles.fill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+                </View>
+              </View>
+              {skipped ? null : (
+                <IconButton
+                  name="add"
+                  label={`Increase ${habit.name}`}
+                  bg={alpha(color, 0.15)}
+                  color={tagInk(habit.color)}
+                  onPress={() => onStep(habit, stepFor(habit.target))}
+                />
+              )}
             </View>
           ) : null}
         </Animated.View>
@@ -212,12 +221,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 14, minHeight: 76, gap: 12 },
   icon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 24 },
   body: { flex: 1, minWidth: 0 },
   name: { fontSize: 17, fontWeight: '700' },
   sub: { fontSize: 13, marginTop: 3 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  value: { fontSize: 18, fontWeight: '800', minWidth: 34, textAlign: 'center', fontVariant: ['tabular-nums'] },
   check: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,
@@ -226,6 +232,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  track: { height: 4, marginHorizontal: 14, marginBottom: 10, borderRadius: 2, overflow: 'hidden' },
+  measureRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
+  measureBody: { flex: 1, gap: 6 },
+  progressText: { fontSize: 15, textAlign: 'center' },
+  progressValue: { fontWeight: '800', fontVariant: ['tabular-nums'] },
+  track: { height: 4, borderRadius: 2, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2 },
 });

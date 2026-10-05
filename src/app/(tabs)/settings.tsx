@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
-import { Card, ScreenHeader, Segmented, SectionLabel, ThemedSwitch, TimeStepper } from '@/components/ui';
+import { Card, ScreenHeader, Segmented, SectionLabel, ThemedSwitch, TimeStepper, useLargeText } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { exportCsv } from '@/lib/csv';
 import { askForReminders, notificationsUnavailableReason } from '@/lib/notifications';
@@ -139,7 +139,9 @@ function Row({
   onPress: () => void;
 }) {
   const { c } = useTheme();
+  const stacked = useLargeText();
   const color = danger ? c.dangerText : c.text;
+  const detailText = detail ? <Text style={[styles.help, { color: c.textMuted }]}>{detail}</Text> : null;
   return (
     <Pressable
       onPress={onPress}
@@ -147,8 +149,11 @@ function Row({
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
     >
       <Ionicons name={icon} size={22} color={color} />
-      <Text style={[styles.label, { color, flex: 1 }]}>{label}</Text>
-      {detail ? <Text style={[styles.help, { color: c.textMuted }]}>{detail}</Text> : null}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.label, { color }]}>{label}</Text>
+        {stacked ? detailText : null}
+      </View>
+      {stacked ? null : detailText}
       <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
     </Pressable>
   );

@@ -62,6 +62,7 @@ yarn-error.log*
 
 # ---- Test coverage & caches ----
 coverage/
+review-screenshots/
 .cache/
 .eslintcache
 .turbo/

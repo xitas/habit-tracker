@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
-import { Fab, ScreenHeader, SectionLabel } from '@/components/ui';
+import { Emoji, FAB_CLEARANCE, Fab, ScreenHeader, SectionLabel } from '@/components/ui';
 import { formatTime } from '@/lib/dates';
 import { computeStreaks, frequencyLabel, type Streaks } from '@/lib/schedule';
 import { useStore } from '@/lib/store';
@@ -34,13 +34,13 @@ const HabitRow = memo(function HabitRow({ habit: h, streak, blocked }: { habit: 
       ]}
     >
       <View style={[styles.icon, { backgroundColor: alpha(tag(h.color), 0.15) }]}>
-        <Text style={{ fontSize: 22 }}>{h.icon}</Text>
+        <Emoji size={22}>{h.icon}</Emoji>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
+        <Text style={[styles.name, { color: c.text }]}>
           {h.name}
         </Text>
-        <Text numberOfLines={1} style={[styles.meta, { color: c.textMuted }]}>
+        <Text style={[styles.meta, { color: c.textMuted }]}>
           {details.join(' · ')}
         </Text>
       </View>
@@ -114,7 +114,7 @@ export default function HabitsScreen() {
         ListEmptyComponent={
           <Text style={[styles.empty, { color: c.textMuted }]}>No active habits. Tap + to create one.</Text>
         }
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}
         initialNumToRender={12}
         windowSize={7}
       />

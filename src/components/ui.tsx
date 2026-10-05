@@ -1,12 +1,59 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatTime, makeTime, parseTime } from '@/lib/dates';
 import { radius, shadow, useTheme } from '@/lib/theme';
 
 export const MIN_TOUCH = 44;
+
+/**
+ * Largest font scale allowed for text that sits in a layout that can't grow
+ * (everything else scales with the phone's text size, without limit):
+ * - title: large screen titles (a single long word would overflow the width)
+ * - grid: labels in fixed 7-column rows (calendar days, weekday letters, week bars, tab bar)
+ * - icon: emoji icons in fixed-size tiles (vector icons don't scale at all)
+ * - ring: the number inside the progress ring
+ * - field: the big number input in the entry sheet
+ * - header: navigation bar titles (the bar has a fixed height on both platforms)
+ */
+export const FONT_CAPS = { title: 2, grid: 1.5, icon: 1.4, ring: 1.3, field: 1.5, header: 1.3 } as const;
+
+/** Bottom padding for scrolling lists under the floating + button, so the last row can scroll clear of it. */
+export const FAB_CLEARANCE = 60 + 20 + 32;
+
+/**
+ * The user's text size as a multiplier (1 = default). On phones this is the system
+ * font scale. On web, react-native-web doesn't report one, so the browser's default
+ * font size (Settings → Font size) is used for layout decisions.
+ */
+export function useFontScale(): number {
+  const { fontScale } = useWindowDimensions();
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return fontScale;
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return Math.max(fontScale, root / 16);
+}
+
+/** True when the text size is large enough that side-by-side layouts should stack. */
+export function useLargeText(): boolean {
+  return useFontScale() >= 1.5;
+}
+
+/** An emoji habit icon. Themed color, so custom text icons stay visible in dark mode. */
+export function Emoji({ children, size }: { children: string; size: number }) {
+  const { c } = useTheme();
+  return (
+    <Text
+      style={{ fontSize: size, color: c.text, textAlign: 'center' }}
+      maxFontSizeMultiplier={FONT_CAPS.icon}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    >
+      {children}
+    </Text>
+  );
+}
 
 export function ScreenHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
   const { c } = useTheme();
@@ -15,7 +62,9 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <View style={{ flex: 1 }}>
         {subtitle ? <Text style={[styles.subtitle, { color: c.textMuted }]}>{subtitle}</Text> : null}
-        <Text style={[styles.title, { color: c.text }]}>{title}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={FONT_CAPS.title} style={[styles.title, { color: c.text }]}>
+          {title}
+        </Text>
       </View>
       {right}
     </View>
@@ -118,12 +167,17 @@ export function Chip({
   onPress,
   color,
   style,
+  accessibilityLabel,
+  maxFontSizeMultiplier,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
   color?: string;
   style?: StyleProp<ViewStyle>;
+  /** Spoken label when the visible one is abbreviated (e.g. "Monday" for "M"). */
+  accessibilityLabel?: string;
+  maxFontSizeMultiplier?: number;
 }) {
   const { c, onColor, solid } = useTheme();
   const accent = solid(color ?? c.accent);
@@ -131,6 +185,7 @@ export function Chip({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={[
         styles.chip,
@@ -138,7 +193,12 @@ export function Chip({
         style,
       ]}
     >
-      <Text style={{ color: selected ? onColor(accent) : c.text, fontWeight: '600', fontSize: 14 }}>{label}</Text>
+      <Text
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
+        style={[styles.chipText, { color: selected ? onColor(accent) : c.text }]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -153,8 +213,10 @@ export function Segmented<T extends string | number>({
   onChange: (v: T) => void;
 }) {
   const { c } = useTheme();
+  // Large text: options stack, so words like "Measurable" never overflow a narrow segment.
+  const stacked = useLargeText();
   return (
-    <View style={[styles.segmented, { backgroundColor: c.surfaceAlt }]}>
+    <View style={[styles.segmented, stacked && styles.segmentedStacked, { backgroundColor: c.surfaceAlt }]}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -165,7 +227,7 @@ export function Segmented<T extends string | number>({
             onPress={() => onChange(o.value)}
             style={[styles.segment, active && [{ backgroundColor: c.surfaceRaised }, shadow(c, 2, false)]]}
           >
-            <Text style={{ color: active ? c.text : c.textMuted, fontWeight: '600', fontSize: 14 }}>{o.label}</Text>
+            <Text style={[styles.segmentText, { color: active ? c.text : c.textMuted }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -211,18 +273,46 @@ export function useInputTheme() {
 /** Time picker built from steppers: no native picker dependency, works one-handed. */
 export function TimeStepper({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { c } = useTheme();
+  const large = useLargeText();
   const { hour, minute } = parseTime(value);
   const shift = (minutes: number) => {
     const total = (hour * 60 + minute + minutes + 24 * 60) % (24 * 60);
     onChange(makeTime(Math.floor(total / 60), total % 60));
   };
-  return (
-    <View style={styles.stepperRow}>
+  const time = (
+    <Text accessibilityLiveRegion="polite" style={[styles.stepperValue, { color: c.text }]}>
+      {formatTime(value)}
+    </Text>
+  );
+  const earlier = (
+    <>
       <IconButton name="remove" label="Earlier by 1 hour" onPress={() => shift(-60)} />
       <IconButton name="chevron-back" label="Earlier by 15 minutes" onPress={() => shift(-15)} />
-      <Text style={[styles.stepperValue, { color: c.text }]}>{formatTime(value)}</Text>
+    </>
+  );
+  const later = (
+    <>
       <IconButton name="chevron-forward" label="Later by 15 minutes" onPress={() => shift(15)} />
       <IconButton name="add" label="Later by 1 hour" onPress={() => shift(60)} />
+    </>
+  );
+  // Large text: the time gets its own row instead of squeezing between the buttons.
+  if (large) {
+    return (
+      <View style={{ gap: 8 }}>
+        {time}
+        <View style={styles.stepperRow}>
+          {earlier}
+          {later}
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.stepperRow}>
+      {earlier}
+      {time}
+      {later}
     </View>
   );
 }
@@ -245,12 +335,13 @@ export const styles = StyleSheet.create({
     minHeight: 50,
     borderRadius: radius.md,
     paddingHorizontal: 18,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  buttonText: { fontSize: 16, fontWeight: '700' },
+  buttonText: { flexShrink: 1, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   iconButton: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,
@@ -271,13 +362,25 @@ export const styles = StyleSheet.create({
   chip: {
     minHeight: MIN_TOUCH,
     paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmented: { flexDirection: 'row', borderRadius: radius.md, padding: 4 },
-  segment: { flex: 1, minHeight: MIN_TOUCH, borderRadius: radius.sm + 2, alignItems: 'center', justifyContent: 'center' },
+  segmentedStacked: { flexDirection: 'column', gap: 4 },
+  chipText: { fontWeight: '600', fontSize: 14, textAlign: 'center' },
+  segment: {
+    flex: 1,
+    minHeight: MIN_TOUCH,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentText: { fontWeight: '600', fontSize: 14, textAlign: 'center' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  stepperValue: { fontSize: 22, fontWeight: '700', minWidth: 100, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stepperValue: { flexShrink: 1, fontSize: 22, fontWeight: '700', minWidth: 100, textAlign: 'center', fontVariant: ['tabular-nums'] },
 });

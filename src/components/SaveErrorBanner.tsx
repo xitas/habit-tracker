@@ -28,7 +28,7 @@ export function SaveErrorBanner() {
         <Ionicons name="warning-outline" size={22} color={ink} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: ink }]}>Some changes couldn’t be saved</Text>
-          <Text style={[styles.detail, { color: ink }]} numberOfLines={2}>
+          <Text style={[styles.detail, { color: ink }]}>
             {unsavedChanges === 1 ? '1 change is' : `${unsavedChanges} changes are`} kept on screen until saved. {saveError}
           </Text>
         </View>

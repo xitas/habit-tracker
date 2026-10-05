@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Heatmap } from '@/components/Heatmap';
 import { StreakTiles } from '@/components/StreakTiles';
-import { Card, Chip, ScreenHeader, Segmented, SectionLabel } from '@/components/ui';
+import { Card, Chip, Emoji, ScreenHeader, Segmented, SectionLabel } from '@/components/ui';
 import { WeekBars } from '@/components/WeekBars';
 import { addDays, fromKey } from '@/lib/dates';
 import { computeStreaks, habitTally, rate, type Tally } from '@/lib/schedule';
@@ -26,10 +26,12 @@ const RateRow = memo(function RateRow({ habit, tally }: { habit: Habit; tally: T
       accessibilityLabel={`${habit.name}: ${r === null ? 'no data' : `${Math.round(r * 100)} percent`}`}
       style={styles.rateRow}
     >
-      <Text style={styles.rateIcon}>{habit.icon}</Text>
+      <View style={styles.rateIcon}>
+        <Emoji size={22}>{habit.icon}</Emoji>
+      </View>
       <View style={{ flex: 1 }}>
         <View style={styles.rateHead}>
-          <Text numberOfLines={1} style={[styles.rateName, { color: c.text }]}>
+          <Text style={[styles.rateName, { color: c.text }]}>
             {habit.name}
           </Text>
           <Text style={[styles.ratePct, { color: c.text }]}>{r === null ? '—' : `${Math.round(r * 100)}%`}</Text>
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
   hero: { fontSize: 44, fontWeight: '800', marginVertical: 2, fontVariant: ['tabular-nums'] },
   rateRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
-  rateIcon: { fontSize: 22, width: 28, textAlign: 'center' },
+  rateIcon: { width: 34, alignItems: 'center' },
   rateHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
   rateName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   ratePct: { fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },

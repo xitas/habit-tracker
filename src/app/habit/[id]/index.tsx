@@ -8,7 +8,7 @@ import { EntrySheet } from '@/components/EntrySheet';
 import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
 import { Heatmap } from '@/components/Heatmap';
 import { StreakTiles } from '@/components/StreakTiles';
-import { Button, Card, IconButton, SectionLabel } from '@/components/ui';
+import { Button, Card, Emoji, FONT_CAPS, IconButton, SectionLabel, useLargeText } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { addDays, formatLong, formatTime, fromKey } from '@/lib/dates';
 import { computeStreaks, dayState, frequencyLabel, habitStart, habitTally, rate, type DayState } from '@/lib/schedule';
@@ -38,6 +38,7 @@ const HistoryRow = memo(function HistoryRow({
   onPress: (date: string) => void;
 }) {
   const { c, tagInk } = useTheme();
+  const stacked = useLargeText();
   const label = {
     done: { icon: 'checkmark-circle', color: tagInk(habit.color), text: 'Done' },
     partial: { icon: 'ellipse-outline', color: tagInk(habit.color), text: 'Partial' },
@@ -48,6 +49,11 @@ const HistoryRow = memo(function HistoryRow({
     future: { icon: 'ellipse-outline', color: c.textFaint, text: '' },
   } as const;
   const s = label[state];
+  const value = (
+    <Text style={[styles.historyValue, { color: c.textMuted }]}>
+      {habit.type === 'measurable' && entry && entry.value > 0 ? `${entry.value} ${habit.unit}` : s.text}
+    </Text>
+  );
   return (
     <Pressable
       onPress={() => onPress(date)}
@@ -64,15 +70,15 @@ const HistoryRow = memo(function HistoryRow({
       <Ionicons name={s.icon} size={24} color={s.color} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.historyDate, { color: c.text }]}>{isToday ? 'Today' : formatLong(date)}</Text>
+        {stacked ? value : null}
         {entry?.note ? (
+          // A short preview; the full note opens with the row.
           <Text numberOfLines={2} style={[styles.note, { color: c.textMuted }]}>
             “{entry.note}”
           </Text>
         ) : null}
       </View>
-      <Text style={[styles.historyValue, { color: c.textMuted }]}>
-        {habit.type === 'measurable' && entry && entry.value > 0 ? `${entry.value} ${habit.unit}` : s.text}
-      </Text>
+      {stacked ? null : value}
     </Pressable>
   );
 });
@@ -86,6 +92,7 @@ export default function HabitDetailScreen() {
   const log = useStore((s) => s.entries[id] ?? EMPTY_LOG);
   const weekStartsOn = useStore((s) => s.settings.weekStartsOn);
   const remindersBlocked = useRemindersBlocked();
+  const largeText = useLargeText();
 
   const [month, setMonth] = useState(() => {
     const d = fromKey(today);
@@ -140,12 +147,15 @@ export default function HabitDetailScreen() {
 
   const header = (
     <View style={styles.side}>
-      <View style={styles.hero}>
+      {/* Large text: the icon sits above the name so the name gets the full width. */}
+      <View style={[styles.hero, largeText && styles.heroStacked]}>
         <View style={[styles.icon, { backgroundColor: alpha(tag(habit.color), 0.15) }]}>
-          <Text style={{ fontSize: 34 }}>{habit.icon}</Text>
+          <Emoji size={34}>{habit.icon}</Emoji>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.name, { color: c.text }]}>{habit.name}</Text>
+          <Text accessibilityRole="header" maxFontSizeMultiplier={FONT_CAPS.title} style={[styles.name, { color: c.text }]}>
+            {habit.name}
+          </Text>
           <Text style={[styles.meta, { color: c.textMuted }]}>
             {frequencyLabel(habit)}
             {habit.type === 'measurable' ? ` · ${habit.target} ${habit.unit} / day` : ''}
@@ -263,6 +273,7 @@ const styles = StyleSheet.create({
   side: { paddingHorizontal: 16 },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
   icon: { width: 68, height: 68, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  heroStacked: { flexDirection: 'column', alignItems: 'flex-start' },
   name: { fontSize: 24, fontWeight: '800' },
   meta: { fontSize: 14, marginTop: 3 },
   hint: { fontSize: 12, textAlign: 'center', marginTop: 10 },

@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { orderedWeekdays, WEEKDAY_SHORT } from '@/lib/dates';
+import { orderedWeekdays, WEEKDAY_LETTER, WEEKDAY_LONG } from '@/lib/dates';
 import { askForReminders } from '@/lib/notifications';
 import type { HabitDraft } from '@/lib/store';
 import { useStore } from '@/lib/store';
 import { alpha, HABIT_COLORS, HABIT_ICONS, radius, useTheme } from '@/lib/theme';
 import type { Frequency, HabitType, Weekday } from '@/lib/types';
-import { Button, Card, Chip, IconButton, Segmented, SectionLabel, ThemedSwitch, TimeStepper, useInputTheme } from './ui';
+import { Button, Card, Chip, Emoji, FONT_CAPS, IconButton, MIN_TOUCH, Segmented, SectionLabel, ThemedSwitch, TimeStepper, useInputTheme, useLargeText } from './ui';
 
 type FreqKind = Frequency['kind'];
 
@@ -34,6 +34,10 @@ export function HabitForm({
 }) {
   const { c, tag } = useTheme();
   const inputTheme = useInputTheme();
+  const largeText = useLargeText();
+  // Colors: one row of 8 when each swatch gets a full touch target, otherwise a 4 × 2 grid.
+  const { width } = useWindowDimensions();
+  const swatchesPerRow = (width - 32) / HABIT_COLORS.length >= MIN_TOUCH ? HABIT_COLORS.length : HABIT_COLORS.length / 2;
   const insets = useSafeAreaInsets();
   const weekStartsOn = useStore((s) => s.settings.weekStartsOn);
   const start = initial ?? BLANK;
@@ -91,7 +95,7 @@ export function HabitForm({
         {/* Preview + name */}
         <View style={styles.nameRow}>
           <View style={[styles.preview, { backgroundColor: alpha(tag(color), 0.18) }]}>
-            <Text style={{ fontSize: 30 }}>{icon}</Text>
+            <Emoji size={30}>{icon}</Emoji>
           </View>
           <TextInput
             value={name}
@@ -101,6 +105,9 @@ export function HabitForm({
             autoFocus={!initial}
             maxLength={40}
             returnKeyType="done"
+            // Large text: wrap instead of scrolling sideways; Return still finishes editing.
+            multiline={largeText}
+            submitBehavior="blurAndSubmit"
             accessibilityLabel="Habit name"
             style={[inputStyle, styles.nameInput]}
           />
@@ -117,7 +124,7 @@ export function HabitForm({
               accessibilityState={{ selected: icon === e }}
               style={[styles.iconCell, icon === e && { backgroundColor: alpha(tag(color), 0.2) }]}
             >
-              <Text style={{ fontSize: 24 }}>{e}</Text>
+              <Emoji size={24}>{e}</Emoji>
             </Pressable>
           ))}
           <TextInput
@@ -140,7 +147,7 @@ export function HabitForm({
               accessibilityRole="button"
               accessibilityLabel={`Color ${col}`}
               accessibilityState={{ selected: color === col }}
-              style={[styles.swatchHit]}
+              style={[styles.swatchHit, { width: `${100 / swatchesPerRow}%` }]}
             >
               <View
                 style={[
@@ -164,7 +171,7 @@ export function HabitForm({
             onChange={setType}
           />
           {type === 'measurable' ? (
-            <View style={styles.targetRow}>
+            <View style={[styles.targetRow, largeText && styles.targetRowStacked]}>
               <TextInput
                 value={target}
                 onChangeText={setTarget}
@@ -172,7 +179,7 @@ export function HabitForm({
                 {...inputTheme}
                 keyboardType="decimal-pad"
                 accessibilityLabel="Daily target"
-                style={[inputStyle, { width: 96, textAlign: 'center' }]}
+                style={[inputStyle, largeText ? styles.targetStacked : styles.target]}
               />
               <TextInput
                 value={unit}
@@ -180,8 +187,11 @@ export function HabitForm({
                 placeholder="glasses, minutes, pages…"
                 {...inputTheme}
                 maxLength={20}
+                multiline={largeText}
+                submitBehavior="blurAndSubmit"
                 accessibilityLabel="Unit"
-                style={[inputStyle, { flex: 1 }]}
+                // minWidth 0 lets the field shrink inside the row instead of overflowing the card.
+                style={[inputStyle, { flex: 1, minWidth: 0 }]}
               />
             </View>
           ) : (
@@ -205,7 +215,9 @@ export function HabitForm({
               {orderedWeekdays(weekStartsOn).map((d) => (
                 <Chip
                   key={d}
-                  label={WEEKDAY_SHORT[d].slice(0, 2)}
+                  label={WEEKDAY_LETTER[d]}
+                  accessibilityLabel={WEEKDAY_LONG[d]}
+                  maxFontSizeMultiplier={FONT_CAPS.grid}
                   selected={days.includes(d)}
                   color={tag(color)}
                   onPress={() => toggleDay(d)}
@@ -251,16 +263,22 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   preview: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   input: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: 14, fontSize: 16 },
-  nameInput: { flex: 1, fontSize: 18, fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 4, padding: 10 },
-  iconCell: { width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  customEmoji: { flexGrow: 1, marginTop: 6, textAlign: 'center' },
-  colors: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 2 },
-  swatchHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  // minWidth 0: a long name must not widen the form past the screen.
+  nameInput: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: '600' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10 },
+  // 24 icons in an even 6-column grid (4 full rows).
+  iconCell: { width: '16.666%', minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  customEmoji: { flexGrow: 1, minWidth: 0, marginTop: 6, textAlign: 'center' },
+  colors: { flexDirection: 'row', flexWrap: 'wrap' },
+  swatchHit: { minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 32, height: 32, borderRadius: 16 },
   targetRow: { flexDirection: 'row', gap: 10 },
-  days: { flexDirection: 'row', justifyContent: 'space-between' },
-  dayChip: { width: 44, paddingHorizontal: 0 },
+  targetRowStacked: { flexDirection: 'column' },
+  target: { width: 96, textAlign: 'center' },
+  targetStacked: { textAlign: 'center' },
+  // Extends 4px into the card's padding so 7 chips get ~44px of touch width even at 360px.
+  days: { flexDirection: 'row', justifyContent: 'space-between', gap: 4, marginHorizontal: -4 },
+  dayChip: { flex: 1, maxWidth: 52, paddingHorizontal: 0 },
   perWeek: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   perWeekText: { fontSize: 18, fontWeight: '700' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },

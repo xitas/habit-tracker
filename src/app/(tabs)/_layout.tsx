@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
-import type { ColorValue } from 'react-native';
+import { Text, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FONT_CAPS, useFontScale } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -22,6 +23,10 @@ const icon = (active: IconName, inactive: IconName) =>
 export default function TabsLayout() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  // Labels scale with the phone's text size up to FONT_CAPS.grid (four fixed-width columns);
+  // the bar's height grows with them instead of clipping.
+  const labelScale = Math.min(useFontScale(), FONT_CAPS.grid);
+  const labelLine = Math.ceil(15 * labelScale);
   return (
     <Tabs
       screenOptions={{
@@ -31,11 +36,19 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: c.surface,
           borderTopColor: c.border,
-          height: 70 + insets.bottom,
+          height: 55 + labelLine + insets.bottom,
           paddingTop: 6,
           paddingBottom: insets.bottom + 8,
         },
-        tabBarLabelStyle: { fontSize: 11, lineHeight: 15, fontWeight: '600' },
+        tabBarLabel: ({ color, children }) => (
+          <Text
+            maxFontSizeMultiplier={FONT_CAPS.grid}
+            numberOfLines={1}
+            style={{ color: color as string, fontSize: 11, lineHeight: 15, fontWeight: '600' }}
+          >
+            {children}
+          </Text>
+        ),
         sceneStyle: { backgroundColor: c.bg },
       }}
     >

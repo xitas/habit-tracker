@@ -8,7 +8,7 @@ import { EmptyState, remainingSuggestions, SuggestionList } from '@/components/E
 import { EntrySheet } from '@/components/EntrySheet';
 import { HabitCard, stepFor } from '@/components/HabitCard';
 import { ProgressRing } from '@/components/ProgressRing';
-import { Card, Fab, ScreenHeader, SectionLabel } from '@/components/ui';
+import { Card, FAB_CLEARANCE, Fab, ScreenHeader, SectionLabel, useLargeText } from '@/components/ui';
 import { formatLong } from '@/lib/dates';
 import { computeStreaks, dayTally, frequencyLabel, getEntry, isDueOn, weeklyRemaining } from '@/lib/schedule';
 import { clearStatus, getState, markDone, markSkipped, setValue, useStore } from '@/lib/store';
@@ -25,8 +25,7 @@ const haptic = (kind: 'light' | 'success') => {
 function cardSubtitle(habit: Habit, entry: Entry | undefined, remaining: number, streak: number): string {
   if (entry?.status === 'skipped') return 'Skipped · tap to undo';
   const parts: string[] = [];
-  if (habit.type === 'measurable') parts.push(`${entry?.value ?? 0} / ${habit.target} ${habit.unit}`);
-  else parts.push(frequencyLabel(habit));
+  parts.push(frequencyLabel(habit));
   if (habit.frequency.kind === 'timesPerWeek' && entry?.status !== 'done') {
     parts.push(`${remaining} left this week`);
   }
@@ -42,6 +41,7 @@ export default function TodayScreen() {
   const weekStartsOn = useStore((s) => s.settings.weekStartsOn);
   const [sheetHabit, setSheetHabit] = useState<Habit | null>(null);
   const [burst, setBurst] = useState(0);
+  const largeText = useLargeText();
 
   // Per-habit results are cached in schedule.ts, so after a tap only the changed habit is recomputed.
   const active = useMemo(() => habits.filter((h) => !h.archived), [habits]);
@@ -143,13 +143,13 @@ export default function TodayScreen() {
     <>
       <ScreenHeader title="Today" subtitle={formatLong(today)} />
       <View style={styles.content}>
-        <Card style={styles.ringCard}>
+        <Card style={[styles.ringCard, largeText && styles.ringCardStacked]}>
           <ProgressRing
             progress={pct}
             label={`${Math.round(pct * 100)}%`}
             caption={tally.expected ? `${tally.done} of ${tally.expected}` : 'Rest day'}
           />
-          <View style={{ flex: 1 }}>
+          <View style={largeText ? styles.ringTextStacked : { flex: 1 }}>
             <Text style={[styles.ringTitle, { color: c.text }]}>
               {tally.expected === 0
                 ? 'Nothing due today'
@@ -222,7 +222,7 @@ export default function TodayScreen() {
         renderItem={renderCard}
         ListHeaderComponent={header}
         ListFooterComponent={footer}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}
         initialNumToRender={10}
         windowSize={7}
       />
@@ -251,6 +251,9 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { paddingHorizontal: 16 },
   ringCard: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  // Large text: the ring sits above the message instead of squeezing it.
+  ringCardStacked: { flexDirection: 'column', alignItems: 'center', gap: 12 },
+  ringTextStacked: { alignSelf: 'stretch', alignItems: 'center' },
   ringTitle: { fontSize: 20, fontWeight: '800' },
   ringBody: { fontSize: 15, marginTop: 4, lineHeight: 20 },
   hint: { fontSize: 12, marginHorizontal: 4, marginTop: -4, marginBottom: 10 },

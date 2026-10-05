@@ -5,7 +5,7 @@ import { MONTHS, orderedWeekdays, toKey, WEEKDAY_LETTER } from '@/lib/dates';
 import { dayState, habitStart, type DayState } from '@/lib/schedule';
 import { mix, useTheme } from '@/lib/theme';
 import type { Habit, HabitLog } from '@/lib/types';
-import { IconButton } from './ui';
+import { FONT_CAPS, IconButton } from './ui';
 
 /** Accent strength for partial days, by thirds of the target. */
 const PARTIAL_LEVELS = [0.3, 0.5, 0.7];
@@ -71,7 +71,7 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
 
       <View style={styles.row}>
         {orderedWeekdays(weekStartsOn).map((d) => (
-          <Text key={d} style={[styles.weekday, { color: c.textMuted }]}>
+          <Text key={d} maxFontSizeMultiplier={FONT_CAPS.grid} style={[styles.weekday, { color: c.textMuted }]}>
             {WEEKDAY_LETTER[d]}
           </Text>
         ))}
@@ -104,7 +104,7 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
                   selected === date && { borderWidth: 2, borderColor: c.text },
                 ]}
               >
-                <Text style={[styles.dayNum, { color: ink }]}>
+                <Text maxFontSizeMultiplier={FONT_CAPS.grid} style={[styles.dayNum, { color: ink }]}>
                   {Number(date.slice(8))}
                 </Text>
                 {hasNote ? <View style={[styles.noteDot, { backgroundColor: ink }]} /> : null}

@@ -4,12 +4,13 @@ import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useMemo } from 'react';
-import { Appearance, Platform, View } from 'react-native';
+import { Appearance, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { RecoveryScreen } from '@/components/RecoveryScreen';
 import { ReminderPermissionSheet } from '@/components/ReminderPermissionSheet';
 import { SaveErrorBanner } from '@/components/SaveErrorBanner';
+import { FONT_CAPS } from '@/components/ui';
 import { ThemeFade } from '@/components/ThemeFade';
 import { useNotificationTaps, useReminderSync } from '@/lib/notifications';
 import { hydrate, useHydrated, useLoadStatus, useStore } from '@/lib/store';
@@ -91,6 +92,17 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: c.bg },
             headerTintColor: c.text,
             headerTitleStyle: { fontWeight: '600', color: c.text },
+            // The bar can't grow taller, so its title scales only up to FONT_CAPS.header.
+            headerTitle: ({ children }) => (
+              <Text
+                accessibilityRole="header"
+                numberOfLines={1}
+                maxFontSizeMultiplier={FONT_CAPS.header}
+                style={{ fontSize: 17, fontWeight: '600', color: c.text }}
+              >
+                {children}
+              </Text>
+            ),
             contentStyle: { backgroundColor: c.bg },
             headerBackButtonDisplayMode: 'minimal',
           }}

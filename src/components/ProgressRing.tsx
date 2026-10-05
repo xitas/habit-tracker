@@ -4,6 +4,7 @@ import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from '
 import Svg, { Circle } from 'react-native-svg';
 
 import { useTheme } from '@/lib/theme';
+import { FONT_CAPS } from './ui';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -52,8 +53,14 @@ export function ProgressRing({
         />
       </Svg>
       <View style={[StyleSheet.absoluteFill, styles.center]}>
-        <Text style={[styles.label, { color: c.text }]}>{label}</Text>
-        {caption ? <Text style={[styles.caption, { color: c.textMuted }]}>{caption}</Text> : null}
+        <Text maxFontSizeMultiplier={FONT_CAPS.ring} style={[styles.label, { color: c.text }]}>
+          {label}
+        </Text>
+        {caption ? (
+          <Text maxFontSizeMultiplier={FONT_CAPS.ring} style={[styles.caption, { color: c.textMuted }]}>
+            {caption}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
