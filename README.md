@@ -1,8 +1,12 @@
-# Habits
+<p align="center">
+  <img src="./assets/icon.png" width="112" alt="Kadam app icon: a staircase rising to a check mark" />
+</p>
+
+# Kadam: Habit Tracker
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-A mobile habit tracker app for building and tracking daily habits: simple to log, works offline, and keeps your data on your phone.
+**Kadam** (Urdu and Hindi for "step") is a mobile habit tracker for building daily habits one step at a time. It's simple to log, works offline, and keeps your data on your phone: no account, no analytics, no ads.
 
 <p align="center">
   <img src="./screenshots/today-light.png" width="250" alt="Today screen in light mode" />
@@ -156,14 +160,20 @@ npm test            # streak logic (incl. equivalence with the original code), s
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
 npm run bench       # performance benchmark (30 habits × 2 years)
+npm run icons       # regenerate every icon, splash and store image from the master SVG
 ```
 
 ## Project Structure
 
 ```text
 habit-tracker/
-├── app.json              # Expo config: name, icons, splash, plugins
-├── assets/               # App icon, splash and favicon images
+├── app.json              # Expo config: name, bundle ID, icons, splash, plugins
+├── eas.json              # EAS Build profiles: development, preview (APK), production
+├── assets/               # App icon, adaptive icon layers, splash, notification icon, favicon
+│   └── icon-source/      # Master icon artwork (SVG) that every PNG is generated from
+├── store-assets/         # Play Store / App Store icons and the Play feature graphic
+├── docs/                 # privacy.html for GitHub Pages
+├── scripts/              # Icon generator and performance benchmark
 └── src/
     ├── app/              # Screens (Expo Router: every file is a route)
     │   ├── _layout.tsx   # Root stack, theme provider, splash and notifications setup
@@ -206,16 +216,22 @@ Settings (week start, reminders, evening nudge time and theme) are stored alongs
 
 ## Building for Production
 
-Release builds use [EAS Build](https://docs.expo.dev/build/introduction/), Expo's cloud build service. It needs a free Expo account. EAS CLI isn't a project dependency, so run it with `npx`:
+Release builds use [EAS Build](https://docs.expo.dev/build/introduction/), Expo's cloud build service. It needs a free Expo account. EAS CLI isn't a project dependency, so run it with `npx`. `eas.json` has three profiles:
+
+| Profile | What it builds |
+| --- | --- |
+| `development` | A development build (with the Expo dev client) for testing on your phone |
+| `preview` | An installable Android **APK** / internal iOS build to share with testers |
+| `production` | An Android App Bundle (**AAB**) for Google Play and an **IPA** for the App Store |
 
 ```bash
 npx eas-cli@latest login
-npx eas-cli@latest build:configure          # creates eas.json (first time only)
-npx eas-cli@latest build --platform android # Android App Bundle (.aab) for Google Play
-npx eas-cli@latest build --platform ios     # .ipa for the App Store (needs an Apple Developer account)
+npx eas-cli@latest build --profile development --platform android
+npx eas-cli@latest build --profile preview --platform android     # APK
+npx eas-cli@latest build --profile production --platform all      # AAB + IPA (iOS needs an Apple Developer account)
 ```
 
-To get an installable **APK** instead of an AAB, add a build profile with `"android": { "buildType": "apk" }` to `eas.json` and build with `--profile <name>`.
+App identity: **Kadam**, bundle ID / package `com.hamzaameer.kadam`. The user-facing version (`1.0.0`) is set in `app.json`; build numbers (`versionCode` / `buildNumber`) are managed by EAS (`"appVersionSource": "remote"`) and go up automatically for each production build.
 
 **Building locally** (requires Android Studio, or Xcode on macOS):
 
@@ -238,15 +254,18 @@ npx expo export --platform web
 - 🗂️ Habit categories and filtering
 - 🏆 Achievements and milestone badges
 
+## Privacy
+
+Kadam stores everything on your device and sends nothing anywhere: no account, no analytics, no ads, no tracking. Reminders are local notifications. Read the full [privacy policy](./PRIVACY.md).
+
 ## Contributing
 
-Contributions are welcome!
-
-1. Fork the repository.
-2. Create a branch: `git checkout -b feature/my-change`.
-3. Make your change, then run `npm test`, `npm run typecheck` and `npm run lint`.
-4. Commit and push, then open a pull request describing what changed and why.
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to run the project and the tests, branch naming, and opening a pull request. Bug reports and feature requests go in [GitHub Issues](https://github.com/xitas/habit-tracker/issues).
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+The code is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
+## Trademark
+
+The MIT License covers the source code only. The name **"Kadam"** and the **Kadam icon** (the staircase-and-check artwork in `assets/` and `store-assets/`) are not covered by the license. If you fork this project and publish or redistribute your own version, please use a different name and a different icon so it isn't confused with Kadam.

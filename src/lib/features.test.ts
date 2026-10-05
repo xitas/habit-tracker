@@ -65,7 +65,7 @@ async function main() {
     const file = createBackup(original, { appVersion: '1.0.0', now: NOW });
     const doc = JSON.parse(file.content);
     check('file metadata', doc.format === BACKUP_FORMAT && doc.appVersion === '1.0.0' && doc.schemaVersion === 1 && doc.exportedAt === NOW.toISOString());
-    check('file name', file.name === 'habits-backup-2026-10-04.json');
+    check('file name', file.name === 'kadam-backup-2026-10-04.json');
     const checked = readBackup(file.content);
     check('valid', checked.ok, checked.ok ? '' : checked.error);
     if (!checked.ok) return;
@@ -140,7 +140,7 @@ async function main() {
       ['newer data version', JSON.stringify({ format: BACKUP_FORMAT, schemaVersion: 99, exportedAt: NOW.toISOString(), data: legacy }), /newer version/],
       ['not JSON', '{"format": "habit-tracker-export", "data": ', /isn’t readable JSON/],
       ['truncated file', createBackup(store.getState(), { appVersion: '1', now: NOW }).content.slice(0, -40), /isn’t readable JSON/],
-      ['some other JSON', JSON.stringify({ hello: 'world' }), /isn’t a Habits backup/],
+      ['some other JSON', JSON.stringify({ hello: 'world' }), /isn’t a Kadam backup/],
       ['damaged record', JSON.stringify({ ...legacy, habits: [{ ...legacy.habits[0], frequency: { kind: 'sometimes' } }] }), /damaged/],
       ['missing version', JSON.stringify({ format: BACKUP_FORMAT, data: legacy }), /data version/],
     ];
@@ -255,7 +255,7 @@ async function main() {
     check('note with quotes and line break kept', logOf(plan.result.entries, 'read')['2026-10-02']?.note === 'A note, with "quotes"\r\nand a second line');
     check('existing data not modified (preview only)', current.entries.read['2026-10-01'].status === 'skipped');
     const bad = planCsvImport('name,when\nx,y', current, 'add', { newId });
-    check('not a Habits CSV → clear error', !bad.ok && /missing the columns/.test(bad.error));
+    check('not a Kadam CSV → clear error', !bad.ok && /missing the columns/.test(bad.error));
     check('frequency labels parse back', ['Every day', 'Weekdays', 'Weekends', '2× per week', 'Tue, Thu'].every((l) => parseFrequency(l) !== null));
   });
 

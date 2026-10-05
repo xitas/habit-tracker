@@ -145,7 +145,7 @@ export function planCsvImport(
   if (missing.length) {
     return {
       ok: false,
-      error: `This isn’t a Habits CSV export: it’s missing the column${missing.length > 1 ? 's' : ''} ${missing.join(', ')}. Nothing was changed.`,
+      error: `This isn’t a Kadam CSV export: it’s missing the column${missing.length > 1 ? 's' : ''} ${missing.join(', ')}. Nothing was changed.`,
     };
   }
   const col = Object.fromEntries(CSV_COLUMNS.map((c) => [c, header.indexOf(c)])) as Record<(typeof CSV_COLUMNS)[number], number>;

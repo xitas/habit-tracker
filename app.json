@@ -1,24 +1,28 @@
 {
   "expo": {
-    "name": "Habits",
-    "slug": "habit-tracker",
+    "name": "Kadam",
+    "slug": "kadam",
+    "scheme": "kadam",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.habittracker.app"
+      "bundleIdentifier": "com.hamzaameer.kadam",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#4F46E5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.habittracker.app"
+      "package": "com.hamzaameer.kadam"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -41,11 +45,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160,
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F7F7F8",
           "dark": {
-            "image": "./assets/splash-icon.png",
+            "image": "./assets/splash-icon-dark.png",
             "backgroundColor": "#0F0F12"
           }
         }
@@ -53,7 +57,6 @@
       "expo-system-ui",
       "expo-sqlite"
     ],
-    "scheme": "habittracker",
     "experiments": {
       "typedRoutes": true
     },

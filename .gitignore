@@ -38,10 +38,11 @@ ios/build/
 *.orig.*
 
 # ---- Environment & secrets ----
+# This is a public repository: signing keys, store credentials and API keys must never be committed.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+# Signing keys and certificates (Android upload/release keys, Apple certificates and profiles)
 *.keystore
 !debug.keystore
 *.jks
@@ -49,7 +50,20 @@ ios/build/
 *.p12
 *.key
 *.pem
+*.cer
+*.certSigningRequest
 *.mobileprovision
+*.provisionprofile
+# EAS local credentials (credentials.json and the files it points to)
+credentials.json
+credentials/
+# Google Play / Google Cloud / Apple service account and API key files
+*service-account*.json
+*service_account*.json
+pc-api-*.json
+google-play-*.json
+api-keys.json
+AuthKey_*.p8
 # Firebase config files can contain API keys; keep them out unless you decide otherwise.
 google-services.json
 GoogleService-Info.plist

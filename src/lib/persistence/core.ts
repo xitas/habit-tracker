@@ -204,7 +204,7 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
 
   async function exportRawData(): Promise<{ name: string; content: string }> {
     const day = stamp().slice(0, 10);
-    return { name: `habit-tracker-raw-${day}.json`, content: await buildRawExport() };
+    return { name: `kadam-raw-${day}.json`, content: await buildRawExport() };
   }
 
   /** Saves a copy of everything readable before a destructive action. Throws if it can't. */

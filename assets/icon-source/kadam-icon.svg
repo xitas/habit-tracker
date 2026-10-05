@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Kadam app icon, "Steps upward". This is the master artwork: every icon,
+    splash and store image is generated from it by scripts/generate-icons.mjs
+    (npm run icons). Keep the ids: the script recolors stairs, badge and check.
+  -->
+  <rect id="background" width="1024" height="1024" fill="#4F46E5"/>
+  <svg id="symbol" x="152" y="152" width="720" height="720" viewBox="-20 -20 640 640">
+    <path id="stairs" d="M66 570H186V460H306V350H426V240H526" fill="none" stroke="#C9C6FB" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle id="badge" cx="476" cy="88" r="100" fill="#FFFFFF"/>
+    <path id="check" d="M428 92L462 124L526 58" fill="none" stroke="#4F46E5" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</svg>

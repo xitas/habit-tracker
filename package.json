@@ -1,5 +1,5 @@
 {
-  "name": "habit-tracker",
+  "name": "kadam",
   "version": "1.0.0",
   "license": "MIT",
   "main": "expo-router/entry",
@@ -33,6 +33,7 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
@@ -47,7 +48,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx src/lib/schedule.test.ts && tsx src/lib/tokens.test.ts && tsx src/lib/reminders/reminders.test.ts && tsx src/lib/persistence/persistence.test.ts && tsx src/lib/schedule.equivalence.test.ts && tsx src/lib/features.test.ts",
     "lint": "expo lint",
-    "bench": "tsx scripts/benchmark.ts"
+    "bench": "tsx scripts/benchmark.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "private": true
 }

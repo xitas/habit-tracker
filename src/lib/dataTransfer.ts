@@ -39,7 +39,7 @@ export async function backUpNow(): Promise<void> {
   await shareTextFile(file.name, file.content, {
     mimeType: 'application/json',
     uti: 'public.json',
-    dialogTitle: 'Save your habits backup',
+    dialogTitle: 'Save your Kadam backup',
   });
   updateSettings({ lastBackupAt: now.toISOString() });
 }
@@ -51,7 +51,7 @@ async function pickTextFile(): Promise<string | null> {
   const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
   if (result.canceled || !result.assets[0]) return null;
   const asset = result.assets[0];
-  if (asset.size && asset.size > 50 * 1024 * 1024) throw new Error('This file is too large (over 50 MB) to be a Habits file');
+  if (asset.size && asset.size > 50 * 1024 * 1024) throw new Error('This file is too large (over 50 MB) to be a Kadam file');
   if (Platform.OS === 'web' && asset.file) return asset.file.text();
   return new File(asset.uri).text();
 }

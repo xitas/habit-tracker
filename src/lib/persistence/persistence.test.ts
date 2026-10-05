@@ -477,7 +477,7 @@ async function main() {
     check('error status', store.getStatus().status === 'error');
     const { name, content } = await store.exportRawData();
     const bundle = JSON.parse(content);
-    check('file name', /^habit-tracker-raw-\d{4}-\d{2}-\d{2}\.json$/.test(name));
+    check('file name', /^kadam-raw-\d{4}-\d{2}-\d{2}\.json$/.test(name));
     check('database rows included', bundle.database.habits.length === 1 && bundle.database.entries.length === 1);
     check('old AsyncStorage value included verbatim', bundle.oldAsyncStorageData === '{"partial": tru');
     check('backup included', typeof bundle.lastGoodBackup === 'string' && bundle.lastGoodBackup.includes('habit-tracker-backup'));

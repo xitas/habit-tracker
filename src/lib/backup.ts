@@ -46,7 +46,7 @@ export function createBackup(data: AppData, opts: { appVersion: string; now: Dat
     counts: { habits: data.habits.length, entries: countEntries(data) },
     data: serialize(data),
   };
-  return { name: `habits-backup-${exportedAt.slice(0, 10)}.json`, content: JSON.stringify(doc, null, 1) };
+  return { name: `kadam-backup-${exportedAt.slice(0, 10)}.json`, content: JSON.stringify(doc, null, 1) };
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -59,7 +59,7 @@ export function readBackup(raw: string): BackupCheck {
   } catch {
     return { ok: false, error: 'This file isn’t a valid backup: it isn’t readable JSON. Nothing was changed.' };
   }
-  if (!isObject(doc)) return { ok: false, error: 'This file isn’t a Habits backup. Nothing was changed.' };
+  if (!isObject(doc)) return { ok: false, error: 'This file isn’t a Kadam backup. Nothing was changed.' };
 
   let version: number;
   let payload: unknown;
@@ -73,7 +73,7 @@ export function readBackup(raw: string): BackupCheck {
     version = 0; // the original format: the data document itself
     payload = doc;
   } else {
-    return { ok: false, error: 'This file isn’t a Habits backup. Nothing was changed.' };
+    return { ok: false, error: 'This file isn’t a Kadam backup. Nothing was changed.' };
   }
 
   if (!Number.isInteger(version) || version < 0) {
@@ -82,7 +82,7 @@ export function readBackup(raw: string): BackupCheck {
   if (version > LATEST_SCHEMA_VERSION) {
     return {
       ok: false,
-      error: `This backup was made by a newer version of Habits (data version ${version}). Update the app, then restore it. Nothing was changed.`,
+      error: `This backup was made by a newer version of Kadam (data version ${version}). Update the app, then restore it. Nothing was changed.`,
     };
   }
 
