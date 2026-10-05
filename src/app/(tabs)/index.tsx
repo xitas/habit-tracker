@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Confetti } from '@/components/Confetti';
 import { EmptyState, remainingSuggestions, SuggestionList } from '@/components/EmptyState';
@@ -10,17 +10,10 @@ import { HabitCard, stepFor } from '@/components/HabitCard';
 import { ProgressRing } from '@/components/ProgressRing';
 import { Card, Fab, ScreenHeader, SectionLabel } from '@/components/ui';
 import { formatLong } from '@/lib/dates';
-import {
-  computeStreaks,
-  dayTally,
-  frequencyLabel,
-  getEntry,
-  isDueOn,
-  weeklyRemaining,
-} from '@/lib/schedule';
-import { clearStatus, markDone, markSkipped, setValue, useStore } from '@/lib/store';
+import { computeStreaks, dayTally, frequencyLabel, getEntry, isDueOn, weeklyRemaining } from '@/lib/schedule';
+import { clearStatus, getState, markDone, markSkipped, setValue, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
-import type { Entry, Habit } from '@/lib/types';
+import { logOf, type Entry, type Habit } from '@/lib/types';
 import { useToday } from '@/lib/useToday';
 
 const haptic = (kind: 'light' | 'success') => {
@@ -50,9 +43,10 @@ export default function TodayScreen() {
   const [sheetHabit, setSheetHabit] = useState<Habit | null>(null);
   const [burst, setBurst] = useState(0);
 
+  // Per-habit results are cached in schedule.ts, so after a tap only the changed habit is recomputed.
   const active = useMemo(() => habits.filter((h) => !h.archived), [habits]);
   const due = useMemo(
-    () => active.filter((h) => isDueOn(h, entries, today, weekStartsOn)),
+    () => active.filter((h) => isDueOn(h, logOf(entries, h.id), today, weekStartsOn)),
     [active, entries, today, weekStartsOn],
   );
   const notDue = useMemo(() => active.filter((h) => !due.includes(h)), [active, due]);
@@ -72,28 +66,67 @@ export default function TodayScreen() {
   // Keep offering the starter habits until the user has a few.
   const suggestions = active.length < 3 ? remainingSuggestions(habits.map((h) => h.name)) : [];
 
-  const complete = (h: Habit) => {
-    if (getEntry(entries, h.id, today)?.status === 'done') return;
-    markDone(h, today);
-    haptic('light');
-  };
-  const skip = (h: Habit) => {
-    if (getEntry(entries, h.id, today)?.status === 'skipped') clearStatus(h, today);
-    else markSkipped(h, today);
-  };
-  const tap = (h: Habit) => {
-    const e = getEntry(entries, h.id, today);
-    if (e?.status === 'skipped') return clearStatus(h, today);
-    if (h.type === 'measurable') return step(h, stepFor(h.target));
-    if (e?.status === 'done') return clearStatus(h, today);
-    complete(h);
-  };
-  const step = (h: Habit, delta: number) => {
-    const e = getEntry(entries, h.id, today);
-    const next = (e?.status === 'skipped' ? 0 : (e?.value ?? 0)) + delta;
-    setValue(h, today, next);
-    if (next >= h.target && (e?.value ?? 0) < h.target) haptic('light');
-  };
+  // Stable handlers: they read the latest entry when called instead of closing over `entries`,
+  // so every card gets the same functions and unchanged cards skip re-rendering.
+  const current = useCallback((h: Habit) => getEntry(getState().entries, h.id, today), [today]);
+  const complete = useCallback(
+    (h: Habit) => {
+      if (current(h)?.status === 'done') return;
+      markDone(h, today);
+      haptic('light');
+    },
+    [current, today],
+  );
+  const skip = useCallback(
+    (h: Habit) => {
+      if (current(h)?.status === 'skipped') clearStatus(h, today);
+      else markSkipped(h, today);
+    },
+    [current, today],
+  );
+  const step = useCallback(
+    (h: Habit, delta: number) => {
+      const e = current(h);
+      const next = (e?.status === 'skipped' ? 0 : (e?.value ?? 0)) + delta;
+      setValue(h, today, next);
+      if (next >= h.target && (e?.value ?? 0) < h.target) haptic('light');
+    },
+    [current, today],
+  );
+  const tap = useCallback(
+    (h: Habit) => {
+      const e = current(h);
+      if (e?.status === 'skipped') return clearStatus(h, today);
+      if (h.type === 'measurable') return step(h, stepFor(h.target));
+      if (e?.status === 'done') return clearStatus(h, today);
+      complete(h);
+    },
+    [current, today, step, complete],
+  );
+  const openSheet = useCallback((h: Habit) => setSheetHabit(h), []);
+
+  const renderCard = useCallback(
+    ({ item: h }: { item: Habit }) => {
+      const log = logOf(entries, h.id);
+      const e = log[today];
+      const streak = computeStreaks(h, log, today, weekStartsOn);
+      return (
+        <View style={styles.content}>
+          <HabitCard
+            habit={h}
+            entry={e}
+            subtitle={cardSubtitle(h, e, weeklyRemaining(h, log, today, weekStartsOn), streak.current)}
+            onComplete={complete}
+            onSkip={skip}
+            onTap={tap}
+            onLongPress={openSheet}
+            onStep={step}
+          />
+        </View>
+      );
+    },
+    [entries, today, weekStartsOn, complete, skip, tap, openSheet, step],
+  );
 
   if (active.length === 0) {
     return (
@@ -106,93 +139,93 @@ export default function TodayScreen() {
     );
   }
 
+  const header = (
+    <>
+      <ScreenHeader title="Today" subtitle={formatLong(today)} />
+      <View style={styles.content}>
+        <Card style={styles.ringCard}>
+          <ProgressRing
+            progress={pct}
+            label={`${Math.round(pct * 100)}%`}
+            caption={tally.expected ? `${tally.done} of ${tally.expected}` : 'Rest day'}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.ringTitle, { color: c.text }]}>
+              {tally.expected === 0
+                ? 'Nothing due today'
+                : allDone
+                  ? 'All done today!'
+                  : tally.done === 0
+                    ? 'Let’s get started'
+                    : 'Nice, keep going'}
+            </Text>
+            <Text style={[styles.ringBody, { color: c.textMuted }]}>
+              {tally.expected === 0
+                ? 'Enjoy the break.'
+                : allDone
+                  ? 'Every habit checked off. 🎉'
+                  : `${tally.expected - tally.done} habit${tally.expected - tally.done === 1 ? '' : 's'} left`}
+            </Text>
+          </View>
+        </Card>
+
+        {due.length > 0 ? (
+          <>
+            <SectionLabel>Due today</SectionLabel>
+            <Text style={[styles.hint, { color: c.textMuted }]}>Swipe right to complete · left to skip</Text>
+          </>
+        ) : null}
+      </View>
+    </>
+  );
+
+  const footer = (
+    <View style={styles.content}>
+      {suggestions.length > 0 ? (
+        <>
+          <SectionLabel>Suggestions</SectionLabel>
+          <SuggestionList suggestions={suggestions} />
+        </>
+      ) : null}
+
+      {notDue.length > 0 ? (
+        <>
+          <SectionLabel>Not due today</SectionLabel>
+          <Card style={{ paddingVertical: 4 }}>
+            {notDue.map((h, i) => (
+              <Text
+                key={h.id}
+                onPress={() => router.push(`/habit/${h.id}`)}
+                style={[
+                  styles.notDue,
+                  { color: c.textMuted, borderTopColor: c.border, borderTopWidth: i ? StyleSheet.hairlineWidth : 0 },
+                ]}
+              >
+                {h.icon}  {h.name}
+                <Text style={{ color: c.textMuted }}>
+                  {'  ·  '}
+                  {h.frequency.kind === 'timesPerWeek' ? 'Weekly goal met' : frequencyLabel(h)}
+                </Text>
+              </Text>
+            ))}
+          </Card>
+        </>
+      ) : null}
+    </View>
+  );
+
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
-        <ScreenHeader title="Today" subtitle={formatLong(today)} />
-        <View style={styles.content}>
-          <Card style={styles.ringCard}>
-            <ProgressRing
-              progress={pct}
-              label={`${Math.round(pct * 100)}%`}
-              caption={tally.expected ? `${tally.done} of ${tally.expected}` : 'Rest day'}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.ringTitle, { color: c.text }]}>
-                {tally.expected === 0
-                  ? 'Nothing due today'
-                  : allDone
-                    ? 'All done today!'
-                    : tally.done === 0
-                      ? 'Let’s get started'
-                      : 'Nice, keep going'}
-              </Text>
-              <Text style={[styles.ringBody, { color: c.textMuted }]}>
-                {tally.expected === 0
-                  ? 'Enjoy the break.'
-                  : allDone
-                    ? 'Every habit checked off. 🎉'
-                    : `${tally.expected - tally.done} habit${tally.expected - tally.done === 1 ? '' : 's'} left`}
-              </Text>
-            </View>
-          </Card>
-
-          {due.length > 0 ? (
-            <>
-              <SectionLabel>Due today</SectionLabel>
-              <Text style={[styles.hint, { color: c.textMuted }]}>Swipe right to complete · left to skip</Text>
-              {due.map((h) => {
-                const e = getEntry(entries, h.id, today);
-                const streak = computeStreaks(h, entries, today, weekStartsOn);
-                return (
-                  <HabitCard
-                    key={h.id}
-                    habit={h}
-                    entry={e}
-                    subtitle={cardSubtitle(h, e, weeklyRemaining(h, entries, today, weekStartsOn), streak.current)}
-                    onComplete={() => complete(h)}
-                    onSkip={() => skip(h)}
-                    onTap={() => tap(h)}
-                    onLongPress={() => setSheetHabit(h)}
-                    onStep={(d) => step(h, d)}
-                  />
-                );
-              })}
-            </>
-          ) : null}
-
-          {suggestions.length > 0 ? (
-            <>
-              <SectionLabel>Suggestions</SectionLabel>
-              <SuggestionList suggestions={suggestions} />
-            </>
-          ) : null}
-
-          {notDue.length > 0 ? (
-            <>
-              <SectionLabel>Not due today</SectionLabel>
-              <Card style={{ paddingVertical: 4 }}>
-                {notDue.map((h, i) => (
-                  <Text
-                    key={h.id}
-                    onPress={() => router.push(`/habit/${h.id}`)}
-                    style={[
-                      styles.notDue,
-                      { color: c.textMuted, borderTopColor: c.border, borderTopWidth: i ? StyleSheet.hairlineWidth : 0 },
-                    ]}
-                  >
-                    {h.icon}  {h.name}
-                    <Text style={{ color: c.textMuted }}>
-                      {'  ·  '}
-                      {h.frequency.kind === 'timesPerWeek' ? 'Weekly goal met' : frequencyLabel(h)}
-                    </Text>
-                  </Text>
-                ))}
-              </Card>
-            </>
-          ) : null}
-        </View>
-      </ScrollView>
+      <FlatList
+        data={due}
+        keyExtractor={(h) => h.id}
+        renderItem={renderCard}
+        ListHeaderComponent={header}
+        ListFooterComponent={footer}
+        contentContainerStyle={{ paddingBottom: 110 }}
+        initialNumToRender={10}
+        windowSize={7}
+      />
 
       <Fab label="Add habit" onPress={() => router.push('/habit/new')} />
       <Confetti burstKey={burst} />

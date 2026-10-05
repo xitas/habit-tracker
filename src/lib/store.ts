@@ -59,6 +59,7 @@ export const {
   updateSettings,
   resetAll,
   retry: retryLoad,
+  retrySaves,
   restoreBackup,
   startFresh,
   exportRawData,

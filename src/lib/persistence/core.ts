@@ -9,7 +9,7 @@
 // - Destructive recovery actions first save a copy of everything readable, and
 //   move to a new database file instead of deleting the old one.
 
-import { entryKey, type AppData, type Entry, type EntryStatus, type Habit, type Settings } from '../types';
+import { entryKey, logOf, serialize, type AppData, type Entry, type EntryStatus, type Habit, type Settings } from '../types';
 import { LATEST_SCHEMA_VERSION, META_KEYS } from './schema';
 import type { Backend, PersistenceEnv } from './types';
 import { countEntries, describeError, emptyData, parseAppData } from './validate';
@@ -41,8 +41,12 @@ export interface StatusSnapshot {
   backup: BackupInfo | null;
   /** A recovery action is running. */
   busy: boolean;
-  /** The most recent failed save, if any (the change is kept in memory). */
+  /** Why the latest save failed, while some changes are only in memory. Drives the warning banner. */
   saveError: string | null;
+  /** How many changed items are waiting to be saved. */
+  unsavedChanges: number;
+  /** A retry of the failed saves is running. */
+  retryingSaves: boolean;
 }
 
 export interface ActionResult {
@@ -56,7 +60,15 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unknown) => void = console.warn) {
   let state: AppData = emptyData();
-  let status: StatusSnapshot = { status: 'loading', error: null, backup: null, busy: false, saveError: null };
+  let status: StatusSnapshot = {
+    status: 'loading',
+    error: null,
+    backup: null,
+    busy: false,
+    saveError: null,
+    unsavedChanges: 0,
+    retryingSaves: false,
+  };
   let backend: Backend | null = null;
   let generation = DEFAULT_GENERATION;
   let writes: Promise<void> = Promise.resolve();
@@ -123,7 +135,8 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
       stage = 'load';
       const data = await b.loadAll();
       state = data;
-      setStatus({ status: 'ready', error: null, backup: null, saveError: null });
+      clearUnsaved();
+      setStatus({ status: 'ready', error: null, backup: null, saveError: null, unsavedChanges: 0 });
       backupWrite = saveBackup(data);
     } catch (err) {
       log(`Couldn't load data (${stage})`, err);
@@ -137,7 +150,8 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
   async function saveBackup(data: AppData) {
     // Never replace a backup that has data with an empty snapshot (e.g. after a reset).
     if (data.habits.length === 0 && countEntries(data) === 0) return;
-    const payload = { format: 'habit-tracker-backup', schemaVersion: LATEST_SCHEMA_VERSION, savedAt: stamp(), data };
+    // Saved in the flat SerializedData shape, which every version reads.
+    const payload = { format: 'habit-tracker-backup', schemaVersion: LATEST_SCHEMA_VERSION, savedAt: stamp(), data: serialize(data) };
     try {
       await env.files.write(BACKUP_FILE, JSON.stringify(payload));
     } catch (err) {
@@ -264,15 +278,95 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     return false;
   }
 
+  // ---- Unsaved changes ----
+  // A failed write marks what it touched. The change itself stays in memory,
+  // and retrySaves() writes the *current* value of each marked item, so a retry
+  // can never overwrite a newer change with an older one.
+
+  type Touched = { habit?: string; entry?: { habitId: string; date: string }; settings?: true; reset?: true };
+  const unsaved = {
+    habits: new Set<string>(),
+    entries: new Map<string, { habitId: string; date: string }>(),
+    settings: false,
+    reset: false,
+  };
+
+  function clearUnsaved() {
+    unsaved.habits.clear();
+    unsaved.entries.clear();
+    unsaved.settings = false;
+    unsaved.reset = false;
+  }
+
+  const countUnsaved = () =>
+    unsaved.habits.size + unsaved.entries.size + (unsaved.settings ? 1 : 0) + (unsaved.reset ? 1 : 0);
+
+  function markUnsaved(t: Touched) {
+    if (t.habit) unsaved.habits.add(t.habit);
+    if (t.entry) unsaved.entries.set(entryKey(t.entry.habitId, t.entry.date), t.entry);
+    if (t.settings) unsaved.settings = true;
+    if (t.reset) unsaved.reset = true;
+  }
+
   /** Queues one targeted write. Writes run in order, one at a time, with no delay. */
-  function persist(what: string, op: (b: Backend) => Promise<void>) {
+  function persist(what: string, touched: Touched, op: (b: Backend) => Promise<void>) {
     const b = backend!;
     writes = writes
       .then(() => op(b))
       .catch((err) => {
         log(`Couldn't save "${what}"`, err);
-        setStatus({ saveError: `${what}: ${describeError(err)}` });
+        markUnsaved(touched);
+        setStatus({ saveError: describeError(err), unsavedChanges: countUnsaved() });
       });
+  }
+
+  /** Writes the current in-memory value of everything a failed save left unsaved. */
+  async function writeUnsaved(b: Backend) {
+    if (unsaved.reset) {
+      // A reset failed part-way: rewrite everything from memory in one transaction.
+      await b.replaceAll(state);
+      clearUnsaved();
+      return;
+    }
+    for (const id of [...unsaved.habits]) {
+      const habit = state.habits.find((h) => h.id === id);
+      await (habit ? b.putHabit(habit) : b.deleteHabit(id));
+      unsaved.habits.delete(id);
+    }
+    for (const [key, { habitId, date }] of [...unsaved.entries]) {
+      const entry = logOf(state.entries, habitId)[date];
+      await (entry ? b.putEntry(entry) : b.deleteEntry(habitId, date));
+      unsaved.entries.delete(key);
+    }
+    if (unsaved.settings) {
+      await b.putSettings(state.settings);
+      unsaved.settings = false;
+    }
+  }
+
+  /** Retries the failed saves. Changes stay in memory whether or not it succeeds. */
+  function retrySaves(): Promise<ActionResult> {
+    if (!backend || status.status !== 'ready') return Promise.resolve({ ok: false, message: "Data isn't loaded." });
+    if (countUnsaved() === 0) {
+      setStatus({ saveError: null, unsavedChanges: 0 });
+      return Promise.resolve({ ok: true, message: 'Everything is saved.' });
+    }
+    const b = backend;
+    setStatus({ retryingSaves: true });
+    // Runs in the write queue, after anything already pending.
+    const attempt = writes.then(async (): Promise<ActionResult> => {
+      try {
+        await writeUnsaved(b);
+        setStatus({ saveError: null, unsavedChanges: 0, retryingSaves: false });
+        return { ok: true, message: 'All changes saved.' };
+      } catch (err) {
+        log('Retrying failed saves failed', err);
+        setStatus({ saveError: describeError(err), unsavedChanges: countUnsaved(), retryingSaves: false });
+        return { ok: false, message: describeError(err) };
+      }
+    });
+    writes = attempt.then(() => {});
+    return attempt;
   }
 
   function commit(next: AppData) {
@@ -284,7 +378,7 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     if (!canWrite('add habit')) return null;
     const habit: Habit = { ...draft, id: newId(), createdAt: env.now().toISOString(), archived: false };
     commit({ ...state, habits: [...state.habits, habit] });
-    persist('add habit', (b) => b.putHabit(habit));
+    persist('add habit', { habit: habit.id }, (b) => b.putHabit(habit));
     return habit;
   }
 
@@ -294,27 +388,25 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     if (!current) return;
     const next = { ...current, ...patch, id };
     commit({ ...state, habits: state.habits.map((h) => (h.id === id ? next : h)) });
-    persist('update habit', (b) => b.putHabit(next));
+    persist('update habit', { habit: id }, (b) => b.putHabit(next));
   }
 
   function deleteHabit(id: string) {
     if (!canWrite('delete habit')) return;
-    const entries = { ...state.entries };
-    for (const key in entries) if (entries[key].habitId === id) delete entries[key];
+    const { [id]: _removed, ...entries } = state.entries;
     commit({ ...state, habits: state.habits.filter((h) => h.id !== id), entries });
-    persist('delete habit', (b) => b.deleteHabit(id));
+    persist('delete habit', { habit: id }, (b) => b.deleteHabit(id));
   }
 
   function writeEntry(habitId: string, date: string, next: Entry | null) {
-    const key = entryKey(habitId, date);
-    const entries = { ...state.entries };
-    if (next) entries[key] = next;
-    else delete entries[key];
-    commit({ ...state, entries });
-    persist('save entry', (b) => (next ? b.putEntry(next) : b.deleteEntry(habitId, date)));
+    // Only this habit's log is replaced; every other habit keeps its object (and its caches).
+    const { [date]: _previous, ...rest } = logOf(state.entries, habitId);
+    const log = next ? { ...rest, [date]: next } : rest;
+    commit({ ...state, entries: { ...state.entries, [habitId]: log } });
+    persist('save entry', { entry: { habitId, date } }, (b) => (next ? b.putEntry(next) : b.deleteEntry(habitId, date)));
   }
 
-  const existing = (habitId: string, date: string): Entry | undefined => state.entries[entryKey(habitId, date)];
+  const existing = (habitId: string, date: string): Entry | undefined => logOf(state.entries, habitId)[date];
 
   /** Store an entry, or drop it when it carries no information. */
   function put(habitId: string, date: string, value: number, entryStatus: EntryStatus, note?: string) {
@@ -366,13 +458,13 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
   function updateSettings(patch: Partial<Settings>) {
     if (!canWrite('update settings')) return;
     commit({ ...state, settings: { ...state.settings, ...patch } });
-    persist('update settings', (b) => b.putSettings(patch));
+    persist('update settings', { settings: true }, (b) => b.putSettings(patch));
   }
 
   function resetAll() {
     if (!canWrite('reset all data')) return;
     commit(emptyData());
-    persist('reset all data', (b) => b.resetAll());
+    persist('reset all data', { reset: true }, (b) => b.resetAll());
   }
 
   return {
@@ -400,6 +492,7 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     },
     // Recovery
     retry,
+    retrySaves,
     restoreBackup,
     startFresh,
     exportRawData,

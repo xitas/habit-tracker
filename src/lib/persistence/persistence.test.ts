@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-import { entryKey, type Habit } from '../types';
+import { logOf, type Habit } from '../types';
 import { BACKUP_FILE, LEGACY_STORAGE_KEY, STORAGE_KEYS, type AppStore } from './core';
 import { makeDevice, makeLegacyData, readDb, sameData } from './testing/harness';
 import { countEntries, emptyData } from './validate';
@@ -72,7 +72,7 @@ async function main() {
     check('reloaded data matches', sameData(store.getState(), snapshot));
     check('habit order kept', store.getState().habits.map((h) => h.name).join() === 'Drink more water,Read');
     check('edit saved', store.getState().habits[0].target === 10);
-    check('note saved', store.getState().entries[entryKey(read.id, '2026-10-03')]?.note === 'Finished chapter 3');
+    check('note saved', logOf(store.getState().entries, read.id)['2026-10-03']?.note === 'Finished chapter 3');
     check('settings saved', store.getState().settings.theme === 'dark' && store.getState().settings.weekStartsOn === 0);
 
     // Clearing an entry removes its row; deleting a habit removes its entries.
@@ -84,9 +84,9 @@ async function main() {
     store = await device.launch();
     const s = store.getState();
     check('deleted habit gone', !s.habits.some((h) => h.id === water.id));
-    check('its entries gone', !Object.values(s.entries).some((e) => e.habitId === water.id));
-    check('cleared entry gone', !s.entries[entryKey(read.id, '2026-10-02')]);
-    check('other data kept', !!s.entries[entryKey(read.id, '2026-10-03')]);
+    check('its entries gone', Object.keys(logOf(s.entries, water.id)).length === 0);
+    check('cleared entry gone', !logOf(s.entries, read.id)['2026-10-02']);
+    check('other data kept', !!logOf(s.entries, read.id)['2026-10-03']);
     check('new habit added at the end', s.habits[s.habits.length - 1]?.id === added.id);
     check('database agrees', readDb(device.dbPath()).habits === 2);
     await quit(store);
@@ -155,6 +155,100 @@ async function main() {
     device.cleanup();
   });
 
+  // ---------- Failed saves (warning banner + retry) ----------
+
+  await test('a failed save shows the banner, keeps the change in memory, and retry saves it', async () => {
+    const device = makeDevice();
+    let store = await device.launch();
+    const habit = store.addHabit(draft('Water'))!;
+    await store.flush();
+    check('no banner before', store.getStatus().saveError === null && store.getStatus().unsavedChanges === 0);
+
+    device.faults.failSql = /entries/; // e.g. disk full while writing entries
+    store.markDone(habit, '2026-10-02');
+    store.setValue(habit, '2026-10-03', 3);
+    await store.flush();
+    const st = store.getStatus();
+    check('banner state set', !!st.saveError && st.unsavedChanges === 2, JSON.stringify(st));
+    check('changes kept in memory', logOf(store.getState().entries, habit.id)['2026-10-02']?.status === 'done');
+    check('not in the database yet', readDb(device.dbPath()).entries === 0);
+
+    // Retry while storage still fails: banner stays, nothing lost.
+    const failed = await store.retrySaves();
+    check('retry reports failure', !failed.ok && !!store.getStatus().saveError);
+    check('still 2 unsaved', store.getStatus().unsavedChanges === 2);
+    check('memory untouched by failed retry', logOf(store.getState().entries, habit.id)['2026-10-03']?.value === 3);
+
+    // Storage recovers: retry saves everything and hides the banner.
+    device.faults.failSql = undefined;
+    const ok = await store.retrySaves();
+    check('retry succeeds', ok.ok, ok.message);
+    check('banner cleared', store.getStatus().saveError === null && store.getStatus().unsavedChanges === 0);
+    check('saved to the database', readDb(device.dbPath()).entries === 2);
+    const saved = store.getState();
+    await quit(store);
+    store = await device.launch();
+    check('saved changes survive a restart', sameData(store.getState(), saved));
+    await quit(store);
+    device.cleanup();
+  });
+
+  await test('retry writes the latest value, never an older failed one', async () => {
+    const device = makeDevice();
+    let store = await device.launch();
+    const habit = store.addHabit(draft('Water'))!;
+    await store.flush();
+    device.faults.failSql = /INSERT OR REPLACE INTO entries/;
+    store.markDone(habit, '2026-10-03'); // fails
+    await store.flush();
+    device.faults.failSql = undefined;
+    store.markSkipped(habit, '2026-10-03'); // succeeds, newer
+    await store.flush();
+    check('banner still shown for the earlier failure', !!store.getStatus().saveError);
+    await store.retrySaves();
+    const raw = new DatabaseSync(device.dbPath());
+    const rows = raw.prepare('SELECT status FROM entries').all() as { status: string }[];
+    raw.close();
+    check('database has the newer value', rows.length === 1 && rows[0].status === 'skipped', JSON.stringify(rows));
+    await quit(store);
+    store = await device.launch();
+    check('after restart too', logOf(store.getState().entries, habit.id)['2026-10-03']?.status === 'skipped');
+    await quit(store);
+    device.cleanup();
+  });
+
+  await test('a failed delete or reset is completed by retry from memory', async () => {
+    const device = makeDevice();
+    let store = await device.launch();
+    const a = store.addHabit(draft('A'))!;
+    const b = store.addHabit(draft('B'))!;
+    store.markDone(a, '2026-10-02');
+    store.markDone(b, '2026-10-02');
+    await store.flush();
+    device.faults.failSql = /^DELETE FROM habits WHERE id/;
+    store.deleteHabit(a.id);
+    await store.flush();
+    check('delete failed and is pending', store.getStatus().unsavedChanges === 1);
+    device.faults.failSql = undefined;
+    await store.retrySaves();
+    const db1 = readDb(device.dbPath());
+    check('delete completed', db1.habits === 1 && db1.entries === 1, `${db1.habits}/${db1.entries}`);
+
+    device.faults.failSql = /^DELETE FROM entries; DELETE FROM habits/;
+    store.resetAll();
+    store.addHabit(draft('After reset'));
+    await store.flush();
+    check('reset failed and is pending', !!store.getStatus().saveError);
+    device.faults.failSql = undefined;
+    const r = await store.retrySaves();
+    check('retry ok', r.ok, r.message);
+    await quit(store);
+    store = await device.launch();
+    check('database matches memory after retry', store.getState().habits.map((h) => h.name).join() === 'After reset' && countEntries(store.getState()) === 0);
+    await quit(store);
+    device.cleanup();
+  });
+
   // ---------- Migration from AsyncStorage ----------
 
   await test('migrates old AsyncStorage data, verified, and leaves the original untouched', async () => {
@@ -168,7 +262,7 @@ async function main() {
     check('original untouched', device.kv.map.get(LEGACY_STORAGE_KEY) === raw);
     check('marked as migrated', !!device.kv.map.get(STORAGE_KEYS.legacyDone));
     const db = readDb(device.dbPath());
-    check('row counts match', db.habits === 4 && db.entries === countEntries(legacy));
+    check('row counts match', db.habits === 4 && db.entries === Object.keys(legacy.entries).length);
     await quit(store);
 
     // Runs once: later changes to the old key are never imported again.
@@ -187,15 +281,15 @@ async function main() {
     const t0 = performance.now();
     const store = await device.launch();
     const ms = performance.now() - t0;
-    const n = countEntries(legacy);
+    const n = Object.keys(legacy.entries).length;
     const notes = Object.values(legacy.entries).filter((e) => e.note).length;
     console.log(`    ${legacy.habits.length} habits, ${n.toLocaleString()} entries (${notes.toLocaleString()} with notes), ${(raw.length / 1024 / 1024).toFixed(2)} MB old value → migrated and loaded in ${ms.toFixed(0)} ms`);
     check('ready', store.getStatus().status === 'ready', store.getStatus().error?.message);
     check('identical after migration', sameData(store.getState(), legacy));
     const db = readDb(device.dbPath());
     check('row counts match', db.habits === 30 && db.entries === n, `${db.habits}/${db.entries}`);
-    const noteKey = Object.keys(legacy.entries).find((k) => legacy.entries[k].note)!;
-    check('notes with quotes, emoji and newlines intact', store.getState().entries[noteKey]?.note === legacy.entries[noteKey].note);
+    const noted = Object.values(legacy.entries).find((e) => e.note)!;
+    check('notes with quotes, emoji and newlines intact', logOf(store.getState().entries, noted.habitId)[noted.date]?.note === noted.note);
     check('original untouched', device.kv.map.get(LEGACY_STORAGE_KEY) === raw);
     await quit(store);
     device.cleanup();

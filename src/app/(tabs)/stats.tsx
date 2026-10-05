@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Heatmap } from '@/components/Heatmap';
@@ -8,11 +8,39 @@ import { Card, Chip, ScreenHeader, Segmented, SectionLabel } from '@/components/
 import { WeekBars } from '@/components/WeekBars';
 import { addDays, fromKey } from '@/lib/dates';
 import { computeStreaks, habitTally, rate, type Tally } from '@/lib/schedule';
+import { logOf, type Habit } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 import { useToday } from '@/lib/useToday';
 
 type Range = 7 | 30 | 90;
+
+/** One habit's completion bar. Memoized: re-renders only when its habit or tally changes. */
+const RateRow = memo(function RateRow({ habit, tally }: { habit: Habit; tally: Tally }) {
+  const { c, tag } = useTheme();
+  const r = rate(tally);
+  return (
+    <Pressable
+      onPress={() => router.push(`/habit/${habit.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`${habit.name}: ${r === null ? 'no data' : `${Math.round(r * 100)} percent`}`}
+      style={styles.rateRow}
+    >
+      <Text style={styles.rateIcon}>{habit.icon}</Text>
+      <View style={{ flex: 1 }}>
+        <View style={styles.rateHead}>
+          <Text numberOfLines={1} style={[styles.rateName, { color: c.text }]}>
+            {habit.name}
+          </Text>
+          <Text style={[styles.ratePct, { color: c.text }]}>{r === null ? '—' : `${Math.round(r * 100)}%`}</Text>
+        </View>
+        <View style={[styles.rateTrack, { backgroundColor: c.surfaceAlt }]}>
+          <View style={[styles.rateFill, { width: `${(r ?? 0) * 100}%`, backgroundColor: tag(habit.color) }]} />
+        </View>
+      </View>
+    </Pressable>
+  );
+});
 
 export default function StatsScreen() {
   const { c, tag } = useTheme();
@@ -31,8 +59,9 @@ export default function StatsScreen() {
   });
 
   const from = addDays(today, -(range - 1));
+  // Cached per habit: after a change, only that habit's tally is recomputed.
   const perHabit = useMemo(
-    () => active.map((h) => ({ habit: h, tally: habitTally(h, entries, from, today, today, weekStartsOn) })),
+    () => active.map((h) => ({ habit: h, tally: habitTally(h, logOf(entries, h.id), from, today, today, weekStartsOn) })),
     [active, entries, from, today, weekStartsOn],
   );
   const overall = perHabit.reduce<Tally>(
@@ -79,33 +108,9 @@ export default function StatsScreen() {
           </Text>
 
           <View style={{ marginTop: 16, gap: 12 }}>
-            {perHabit.map(({ habit, tally }) => {
-              const r = rate(tally);
-              return (
-                <Pressable
-                  key={habit.id}
-                  onPress={() => router.push(`/habit/${habit.id}`)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${habit.name}: ${r === null ? 'no data' : `${Math.round(r * 100)} percent`}`}
-                  style={styles.rateRow}
-                >
-                  <Text style={styles.rateIcon}>{habit.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.rateHead}>
-                      <Text numberOfLines={1} style={[styles.rateName, { color: c.text }]}>
-                        {habit.name}
-                      </Text>
-                      <Text style={[styles.ratePct, { color: c.text }]}>
-                        {r === null ? '—' : `${Math.round(r * 100)}%`}
-                      </Text>
-                    </View>
-                    <View style={[styles.rateTrack, { backgroundColor: c.surfaceAlt }]}>
-                      <View style={[styles.rateFill, { width: `${(r ?? 0) * 100}%`, backgroundColor: tag(habit.color) }]} />
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
+            {perHabit.map(({ habit, tally }) => (
+              <RateRow key={habit.id} habit={habit} tally={tally} />
+            ))}
           </View>
         </Card>
 
@@ -127,10 +132,10 @@ export default function StatsScreen() {
           ))}
         </ScrollView>
         <Card style={{ gap: 16 }}>
-          <StreakTiles streaks={computeStreaks(selected, entries, today, weekStartsOn)} />
+          <StreakTiles streaks={computeStreaks(selected, logOf(entries, selected.id), today, weekStartsOn)} />
           <Heatmap
             habit={selected}
-            entries={entries}
+            log={logOf(entries, selected.id)}
             year={month.year}
             month={month.month}
             today={today}

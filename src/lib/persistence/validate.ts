@@ -2,7 +2,7 @@
 // the model throws a DataError, so a damaged record stops the load (and shows
 // the recovery screen) instead of being silently dropped or overwritten.
 
-import { entryKey, type AppData, type Entry, type EntryStatus, type Frequency, type Habit, type Settings, type Weekday } from '../types';
+import { allEntries, type AppData, type Entry, type EntryStatus, type Frequency, type Habit, type Settings, type Weekday } from '../types';
 
 export class DataError extends Error {
   constructor(message: string) {
@@ -120,15 +120,16 @@ export function assembleData(habits: unknown[], entries: unknown[], settings: un
     seen.add(habit.id);
     return habit;
   });
-  const map: Record<string, Entry> = {};
+  // Grouped by habit, then by date (see EntriesByHabit). A repeated habit/date keeps the last one, as before.
+  const byHabit: Record<string, Record<string, Entry>> = {};
   entries.forEach((e, i) => {
     const entry = validateEntry(e, `${source} entry #${i + 1}`);
-    map[entryKey(entry.habitId, entry.date)] = entry;
+    (byHabit[entry.habitId] ??= {})[entry.date] = entry;
   });
-  return { version: 1, habits: validHabits, entries: map, settings: normalizeSettings(settings) };
+  return { version: 1, habits: validHabits, entries: byHabit, settings: normalizeSettings(settings) };
 }
 
-/** Parses a serialized AppData document (the old AsyncStorage format, also used by backups). */
+/** Parses a SerializedData document (the old AsyncStorage format, also used by backups and web storage). */
 export function parseAppData(raw: string, source: string): AppData {
   let doc: unknown;
   try {
@@ -142,6 +143,12 @@ export function parseAppData(raw: string, source: string): AppData {
   return assembleData(doc.habits, Object.values(doc.entries), doc.settings, source);
 }
 
-export const countEntries = (data: AppData) => Object.keys(data.entries).length;
+export function countEntries(data: AppData): number {
+  let n = 0;
+  for (const id in data.entries) n += Object.keys(data.entries[id]).length;
+  return n;
+}
+
+export { allEntries };
 
 export const describeError = (err: unknown) => (err instanceof Error ? err.message : String(err));

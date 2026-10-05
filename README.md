@@ -144,9 +144,10 @@ npm run web       # Browser preview (no notifications or haptics)
 ### Checks
 
 ```bash
-npm test            # streak/scheduling logic and theme-contrast tests
+npm test            # streak logic (incl. equivalence with the original code), storage and theme tests
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
+npm run bench       # performance benchmark (30 habits × 2 years)
 ```
 
 ## Project Structure

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { addDays, formatLong, fromKey, startOfWeek, WEEKDAY_SHORT } from '@/lib/dates';
 import { dayTally } from '@/lib/schedule';
 import { useTheme } from '@/lib/theme';
-import type { Entry, Habit } from '@/lib/types';
+import type { EntriesByHabit, Habit } from '@/lib/types';
 import { IconButton } from './ui';
 
 const CHART_HEIGHT = 120;
@@ -17,7 +17,7 @@ export function WeekBars({
   weekStartsOn,
 }: {
   habits: Habit[];
-  entries: Record<string, Entry>;
+  entries: EntriesByHabit;
   today: string;
   weekStartsOn: 0 | 1;
 }) {

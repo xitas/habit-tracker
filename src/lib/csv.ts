@@ -1,6 +1,6 @@
 import { frequencyLabel } from './schedule';
 import { shareTextFile } from './shareFile';
-import type { AppData } from './types';
+import { allEntries, type AppData } from './types';
 
 const cell = (v: unknown) => {
   const s = v === undefined || v === null ? '' : String(v);
@@ -11,7 +11,7 @@ const cell = (v: unknown) => {
 export function buildCsv(data: AppData): string {
   const habits = new Map(data.habits.map((h) => [h.id, h]));
   const header = ['date', 'habit', 'icon', 'status', 'value', 'target', 'unit', 'frequency', 'archived', 'note'];
-  const rows = Object.values(data.entries)
+  const rows = allEntries(data.entries)
     .sort((a, b) => (a.date === b.date ? a.habitId.localeCompare(b.habitId) : a.date.localeCompare(b.date)))
     .map((e) => {
       const h = habits.get(e.habitId);

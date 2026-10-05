@@ -1,7 +1,7 @@
 // SQLite storage: one row per habit, entry and setting. Every change is a
 // small targeted statement; multi-row changes run in a transaction.
 
-import type { AppData, Entry, Habit, Settings } from '../types';
+import { allEntries, type AppData, type Entry, type Habit, type Settings } from '../types';
 import { LATEST_SCHEMA_VERSION, META_KEYS, META_TABLE_SQL, SCHEMA_MIGRATIONS } from './schema';
 import type { Backend, Counts, SqlDb, SqlValue } from './types';
 import { assembleData, countEntries, DataError, describeError } from './validate';
@@ -141,7 +141,7 @@ export class SqliteBackend implements Backend {
 
   async replaceAll(data: AppData, meta: Record<string, string> = {}): Promise<void> {
     const db = this.conn;
-    const entries = Object.values(data.entries);
+    const entries = allEntries(data.entries);
     await db.withTransactionAsync(async () => {
       await db.execAsync('DELETE FROM entries; DELETE FROM habits; DELETE FROM settings;');
       for (let i = 0; i < data.habits.length; i += HABITS_PER_BATCH) {

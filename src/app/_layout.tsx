@@ -8,6 +8,7 @@ import { Appearance, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { RecoveryScreen } from '@/components/RecoveryScreen';
+import { SaveErrorBanner } from '@/components/SaveErrorBanner';
 import { ThemeFade } from '@/components/ThemeFade';
 import { useNotificationSync } from '@/lib/notifications';
 import { hydrate, useHydrated, useLoadStatus, useStore } from '@/lib/store';
@@ -16,6 +17,16 @@ import { useTheme } from '@/lib/theme';
 // Keep the (theme-aware) native splash up until saved data, including the
 // theme choice, has loaded, so there's no flash of the wrong colors.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * Keeps reminders in sync. It subscribes to every entry change, so it lives in
+ * its own component: a tap re-renders only this (it renders nothing), not the
+ * root layout and the navigator tree below it.
+ */
+function NotificationSync({ enabled }: { enabled: boolean }) {
+  useNotificationSync(enabled);
+  return null;
+}
 
 export default function RootLayout() {
   const hydrated = useHydrated();
@@ -26,7 +37,6 @@ export default function RootLayout() {
   useEffect(() => {
     hydrate().finally(() => SplashScreen.hideAsync().catch(() => {}));
   }, []);
-  useNotificationSync(hydrated);
 
   // Make native UI (alerts, keyboard, pickers) follow the in-app choice.
   useEffect(() => {
@@ -88,6 +98,8 @@ export default function RootLayout() {
           <Stack.Screen name="habit/[id]/index" options={{ title: '' }} />
           <Stack.Screen name="habit/[id]/edit" options={{ presentation: 'modal', title: 'Edit habit' }} />
         </Stack>
+        <NotificationSync enabled={hydrated} />
+        <SaveErrorBanner />
         <ThemeFade />
       </ThemeProvider>
     </GestureHandlerRootView>

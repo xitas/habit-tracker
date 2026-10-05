@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -47,14 +47,27 @@ type Props = {
   habit: Habit;
   entry?: Entry;
   subtitle: string;
-  onComplete: () => void;
-  onSkip: () => void;
-  onTap: () => void;
-  onLongPress: () => void;
-  onStep: (delta: number) => void;
+  // Handlers receive the habit, so the parent can pass the same functions to every card
+  // and React.memo can skip cards whose habit, entry and subtitle didn't change.
+  onComplete: (habit: Habit) => void;
+  onSkip: (habit: Habit) => void;
+  onTap: (habit: Habit) => void;
+  onLongPress: (habit: Habit) => void;
+  onStep: (habit: Habit, delta: number) => void;
 };
 
-export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, onLongPress, onStep }: Props) {
+export const HabitCard = memo(function HabitCard({
+  habit,
+  entry,
+  subtitle,
+  onComplete,
+  onSkip,
+  onTap,
+  onLongPress,
+  onStep,
+}: Props) {
+  const complete = () => onComplete(habit);
+  const skip = () => onSkip(habit);
   const { c, tag, tagInk, onColor } = useTheme();
   const color = tag(habit.color);
   const done = entry?.status === 'done';
@@ -85,8 +98,8 @@ export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, o
       tx.value = e.translationX;
     })
     .onEnd((e) => {
-      if (e.translationX > SWIPE_THRESHOLD) scheduleOnRN(onComplete);
-      else if (e.translationX < -SWIPE_THRESHOLD) scheduleOnRN(onSkip);
+      if (e.translationX > SWIPE_THRESHOLD) scheduleOnRN(complete);
+      else if (e.translationX < -SWIPE_THRESHOLD) scheduleOnRN(skip);
       tx.value = withSpring(0, { damping: 18, stiffness: 180 });
     })
     .onFinalize((_e, success) => {
@@ -119,8 +132,8 @@ export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, o
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, { backgroundColor: c.surface }, shadow(c), cardStyle]}>
           <Pressable
-            onPress={() => !guard.blocks() && onTap()}
-            onLongPress={() => !guard.blocks() && onLongPress()}
+            onPress={() => !guard.blocks() && onTap(habit)}
+            onLongPress={() => !guard.blocks() && onLongPress(habit)}
             delayLongPress={350}
             accessibilityRole="button"
             accessibilityLabel={`${habit.name}, ${a11yState}. ${subtitle}`}
@@ -148,7 +161,7 @@ export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, o
 
             {measurable && !skipped ? (
               <View style={styles.stepper}>
-                <IconButton name="remove" label={`Decrease ${habit.name}`} onPress={() => onStep(-stepFor(habit.target))} />
+                <IconButton name="remove" label={`Decrease ${habit.name}`} onPress={() => onStep(habit, -stepFor(habit.target))} />
                 <Animated.View style={done ? popStyle : undefined}>
                   <Text style={[styles.value, { color: c.text }]}>{value}</Text>
                 </Animated.View>
@@ -157,7 +170,7 @@ export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, o
                   label={`Increase ${habit.name}`}
                   bg={alpha(color, 0.15)}
                   color={tagInk(habit.color)}
-                  onPress={() => onStep(stepFor(habit.target))}
+                  onPress={() => onStep(habit, stepFor(habit.target))}
                 />
               </View>
             ) : (
@@ -182,7 +195,7 @@ export function HabitCard({ habit, entry, subtitle, onComplete, onSkip, onTap, o
       </GestureDetector>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12 },

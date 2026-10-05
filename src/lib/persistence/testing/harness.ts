@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { addDays } from '../../dates';
-import { entryKey, type AppData, type Entry, type Habit } from '../../types';
+import { entryKey, serialize, type AppData, type Entry, type Habit, type SerializedData } from '../../types';
 import { createAppStore } from '../core';
 import { KvBackend } from '../kvBackend';
 import { SqliteBackend } from '../sqliteBackend';
@@ -149,7 +149,6 @@ export function readDb(path: string) {
       habits: one('SELECT COUNT(*) FROM habits'),
       entries: one('SELECT COUNT(*) FROM entries'),
       schema: db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get()?.value ?? null,
-      rows: (sql: string) => db.prepare(sql).all(),
     };
   } finally {
     db.close();
@@ -157,7 +156,7 @@ export function readDb(path: string) {
 }
 
 /** Realistic data in the old AsyncStorage format: `habits` × `days`, ~85% filled, with notes. */
-export function makeLegacyData(habitCount: number, days: number, today = '2026-10-03'): AppData {
+export function makeLegacyData(habitCount: number, days: number, today = '2026-10-03'): SerializedData {
   const freqs: Habit['frequency'][] = [{ kind: 'daily' }, { kind: 'weekdays', days: [1, 3, 5] }, { kind: 'timesPerWeek', count: 3 }];
   const start = addDays(today, -days + 1);
   const habits: Habit[] = Array.from({ length: habitCount }, (_, i) => ({
@@ -199,9 +198,17 @@ function canonical(value: unknown): string {
   );
 }
 
+/** In-memory data (entries grouped by habit) or saved data (flat): compare in the saved shape. */
+const asSaved = (d: AppData | SerializedData): SerializedData => {
+  const first = Object.values(d.entries)[0] as unknown as { status?: unknown } | undefined;
+  return first && typeof first.status === 'string' ? (d as SerializedData) : serialize(d as AppData);
+};
+
 /** Compares two datasets: same habits (in order), entries and settings. Logs the first difference. */
-export function sameData(a: AppData, b: AppData): boolean {
-  const parts = (d: AppData) => ({ habits: canonical(d.habits), entries: canonical(d.entries), settings: canonical(d.settings) });
+export function sameData(x: AppData | SerializedData, y: AppData | SerializedData): boolean {
+  const a = asSaved(x);
+  const b = asSaved(y);
+  const parts = (d: SerializedData) => ({ habits: canonical(d.habits), entries: canonical(d.entries), settings: canonical(d.settings) });
   const pa = parts(a);
   const pb = parts(b);
   for (const k of ['habits', 'entries', 'settings'] as const) {

@@ -40,8 +40,23 @@ export function startOfWeek(key: string, weekStartsOn: 0 | 1): string {
 /** Inclusive list of day keys from `from` to `to`. */
 export function dayRange(from: string, to: string): string[] {
   const out: string[] = [];
-  for (let k = from; k <= to; k = addDays(k, 1)) out.push(k);
+  forEachDay(from, to, (key) => out.push(key));
   return out;
+}
+
+/**
+ * Calls `fn` for each day from `from` to `to` (inclusive) with its weekday.
+ * Same calendar arithmetic as addDays (new Date(y, m, d + i)), but it parses the
+ * start only once instead of once per day, which matters in long streak loops.
+ */
+export function forEachDay(from: string, to: string, fn: (key: string, weekday: Weekday) => void): void {
+  const [y, m, d] = from.split('-').map(Number);
+  for (let i = 0; ; i++) {
+    const date = new Date(y, m - 1, d + i);
+    const key = toKey(date);
+    if (key > to) return;
+    fn(key, date.getDay() as Weekday);
+  }
 }
 
 /** Weekdays in display order for the chosen week start. */

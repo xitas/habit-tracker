@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MONTHS, orderedWeekdays, toKey, WEEKDAY_LETTER } from '@/lib/dates';
-import { dayState, getEntry, habitStart, type DayState } from '@/lib/schedule';
+import { dayState, habitStart, type DayState } from '@/lib/schedule';
 import { mix, useTheme } from '@/lib/theme';
-import type { Entry, Habit } from '@/lib/types';
+import type { Habit, HabitLog } from '@/lib/types';
 import { IconButton } from './ui';
 
 /** Accent strength for partial days, by thirds of the target. */
@@ -12,7 +12,8 @@ const PARTIAL_LEVELS = [0.3, 0.5, 0.7];
 
 type Props = {
   habit: Habit;
-  entries: Record<string, Entry>;
+  /** This habit's entries by date. */
+  log: HabitLog;
   year: number;
   month: number;
   today: string;
@@ -23,9 +24,9 @@ type Props = {
 };
 
 /** One month of a habit as a GitHub-style calendar heatmap. */
-export function Heatmap({ habit, entries, year, month, today, weekStartsOn, selected, onMonthChange, onDayPress }: Props) {
+export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected, onMonthChange, onDayPress }: Props) {
   const { c, onColor } = useTheme();
-  const start = habitStart(habit, entries);
+  const start = habitStart(habit, log);
   const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const lead = (first.getDay() - weekStartsOn + 7) % 7;
@@ -46,7 +47,7 @@ export function Heatmap({ habit, entries, year, month, today, weekStartsOn, sele
   const fill = (state: DayState, date: string) => {
     if (state === 'done') return c.accent;
     if (state === 'partial') {
-      const ratio = (getEntry(entries, habit.id, date)?.value ?? 0) / habit.target;
+      const ratio = (log[date]?.value ?? 0) / habit.target;
       return heat(PARTIAL_LEVELS[Math.min(2, Math.floor(ratio * 3))]);
     }
     if (state === 'missed' || state === 'open') return c.surfaceAlt;
@@ -79,11 +80,11 @@ export function Heatmap({ habit, entries, year, month, today, weekStartsOn, sele
       <View style={styles.grid}>
         {cells.map((date, i) => {
           if (!date) return <View key={`blank-${i}`} style={styles.cell} />;
-          const state = dayState(habit, entries, date, today, start);
+          const state = dayState(habit, log, date, today, start);
           const bg = fill(state, date);
           const filled = state === 'done' || state === 'partial';
           const ink = filled ? onColor(bg) : state === 'future' ? c.textFaint : c.textMuted;
-          const hasNote = !!getEntry(entries, habit.id, date)?.note;
+          const hasNote = !!log[date]?.note;
           const disabled = !onDayPress || state === 'future';
           return (
             <Pressable

@@ -44,12 +44,49 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
 }
 
+/** One habit's entries, keyed by date. Treated as immutable: a change replaces the object. */
+export type HabitLog = Readonly<Record<string, Entry>>;
+
+/** All entries, grouped by habit id. Only the changed habit's log is replaced on a write. */
+export type EntriesByHabit = Readonly<Record<string, HabitLog>>;
+
+/** In-memory app data. */
 export interface AppData {
   version: 1;
   habits: Habit[];
-  /** Keyed by entryKey(habitId, date). */
+  entries: EntriesByHabit;
+  settings: Settings;
+}
+
+/** Saved/exported shape (old AsyncStorage data, backups, web storage): entries keyed by entryKey(). */
+export interface SerializedData {
+  version: 1;
+  habits: Habit[];
   entries: Record<string, Entry>;
   settings: Settings;
 }
 
 export const entryKey = (habitId: string, date: string) => `${habitId}|${date}`;
+
+/** Shared empty log, so habits without entries still have a stable cache key. */
+export const EMPTY_LOG: HabitLog = Object.freeze({});
+
+export const logOf = (entries: EntriesByHabit, habitId: string): HabitLog => entries[habitId] ?? EMPTY_LOG;
+
+export function nestEntries(list: Iterable<Entry>): EntriesByHabit {
+  const out: Record<string, Record<string, Entry>> = {};
+  for (const e of list) (out[e.habitId] ??= {})[e.date] = e;
+  return out;
+}
+
+export function allEntries(entries: EntriesByHabit): Entry[] {
+  const out: Entry[] = [];
+  for (const id in entries) for (const date in entries[id]) out.push(entries[id][date]);
+  return out;
+}
+
+export function serialize(data: AppData): SerializedData {
+  const flat: Record<string, Entry> = {};
+  for (const e of allEntries(data.entries)) flat[entryKey(e.habitId, e.date)] = e;
+  return { version: 1, habits: data.habits, entries: flat, settings: data.settings };
+}

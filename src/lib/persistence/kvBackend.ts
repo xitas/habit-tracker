@@ -5,7 +5,7 @@
 // store with the same Backend contract: strict validation on load, and no write
 // is ever made over a document that failed to load.
 
-import { entryKey, type AppData, type Entry, type Habit, type Settings } from '../types';
+import { serialize, type AppData, type Entry, type Habit, type Settings } from '../types';
 import { LATEST_SCHEMA_VERSION, META_KEYS } from './schema';
 import type { Backend, Counts, KeyValueStore } from './types';
 import { countEntries, DataError, emptyData, parseAppData } from './validate';
@@ -102,17 +102,21 @@ export class KvBackend implements Backend {
   async deleteHabit(id: string): Promise<void> {
     const d = this.current.data;
     d.habits = d.habits.filter((h) => h.id !== id);
-    for (const key in d.entries) if (d.entries[key].habitId === id) delete d.entries[key];
+    const { [id]: _removed, ...rest } = d.entries;
+    d.entries = rest;
     await this.save();
   }
 
   async putEntry(entry: Entry): Promise<void> {
-    this.current.data.entries[entryKey(entry.habitId, entry.date)] = { ...entry };
+    const d = this.current.data;
+    d.entries = { ...d.entries, [entry.habitId]: { ...d.entries[entry.habitId], [entry.date]: { ...entry } } };
     await this.save();
   }
 
   async deleteEntry(habitId: string, date: string): Promise<void> {
-    delete this.current.data.entries[entryKey(habitId, date)];
+    const d = this.current.data;
+    const { [date]: _removed, ...log } = d.entries[habitId] ?? {};
+    d.entries = { ...d.entries, [habitId]: log };
     await this.save();
   }
 
@@ -151,7 +155,8 @@ export class KvBackend implements Backend {
   }
 
   private async save(): Promise<void> {
-    const json = JSON.stringify(this.current);
+    // Saved flat (SerializedData), the same shape older versions wrote and read.
+    const json = JSON.stringify({ ...this.current, data: serialize(this.current.data) });
     await this.kv.setItem(this.key, json);
     this.raw = json;
   }
