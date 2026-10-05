@@ -9,10 +9,9 @@
 // (iOS / store icons) are written without an alpha channel, as Apple requires.
 // The feature graphic's text uses system fonts (Segoe UI, Roboto or Arial).
 
-import { Resvg } from '@resvg/resvg-js';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
+import { opaquePng, render } from './lib/png.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const MASTER = path.join(ROOT, 'assets/icon-source/kadam-icon.svg');
@@ -85,48 +84,6 @@ const tile = (size, rounded = false, x = 0, y = 0) => {
 };
 
 // ---- Rendering ----
-
-function render(svgText, width) {
-  return new Resvg(svgText, {
-    fitTo: { mode: 'width', value: width },
-    font: { loadSystemFonts: true, defaultFontFamily: 'Arial' },
-  }).render();
-}
-
-/** PNG without an alpha channel (the image must be fully opaque). */
-function opaquePng(image) {
-  const { width, height, pixels } = image;
-  const raw = Buffer.alloc((width * 3 + 1) * height);
-  for (let y = 0; y < height; y++) {
-    raw[y * (width * 3 + 1)] = 0; // filter: none
-    for (let x = 0; x < width; x++) {
-      const s = (y * width + x) * 4;
-      if (pixels[s + 3] !== 255) throw new Error(`Pixel ${x},${y} is transparent; this image must be opaque`);
-      const d = y * (width * 3 + 1) + 1 + x * 3;
-      raw[d] = pixels[s];
-      raw[d + 1] = pixels[s + 1];
-      raw[d + 2] = pixels[s + 2];
-    }
-  }
-  const chunk = (type, data) => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(zlib.crc32(body));
-    return Buffer.concat([len, body, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
 
 const written = [];
 function write(rel, svgText, width, { opaque = false } = {}) {

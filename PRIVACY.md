@@ -32,6 +32,7 @@ You can delete everything at any time with **Settings → Reset all data**. Dele
 
 - **Notifications:** to show the reminders you set. Optional.
 - **Vibration:** for small haptic feedback when you check off a habit.
+- **Run at startup (Android):** to set your reminders again after the phone restarts.
 
 Kadam doesn't access your contacts, location, camera, microphone, photos or any other personal data.
 

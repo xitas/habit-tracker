@@ -49,7 +49,8 @@
     "test": "tsx src/lib/schedule.test.ts && tsx src/lib/tokens.test.ts && tsx src/lib/reminders/reminders.test.ts && tsx src/lib/persistence/persistence.test.ts && tsx src/lib/schedule.equivalence.test.ts && tsx src/lib/features.test.ts",
     "lint": "expo lint",
     "bench": "tsx scripts/benchmark.ts",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "screenshots": "node scripts/store-screenshots.mjs"
   },
   "private": true
 }

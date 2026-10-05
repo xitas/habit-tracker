@@ -161,6 +161,7 @@ npm run typecheck   # TypeScript
 npm run lint        # ESLint
 npm run bench       # performance benchmark (30 habits × 2 years)
 npm run icons       # regenerate every icon, splash and store image from the master SVG
+npm run screenshots # rebuild the store screenshots (captions are editable in scripts/store-screenshots.mjs)
 ```
 
 ## Project Structure
@@ -171,9 +172,10 @@ habit-tracker/
 ├── eas.json              # EAS Build profiles: development, preview (APK), production
 ├── assets/               # App icon, adaptive icon layers, splash, notification icon, favicon
 │   └── icon-source/      # Master icon artwork (SVG) that every PNG is generated from
-├── store-assets/         # Play Store / App Store icons and the Play feature graphic
+├── store-assets/         # Store icons, feature graphic, screenshots and listing text (listing.md)
+├── plugins/              # Local Expo config plugin (removes INTERNET from release builds)
 ├── docs/                 # privacy.html for GitHub Pages
-├── scripts/              # Icon generator and performance benchmark
+├── scripts/              # Icon and store screenshot generators, performance benchmark
 └── src/
     ├── app/              # Screens (Expo Router: every file is a route)
     │   ├── _layout.tsx   # Root stack, theme provider, splash and notifications setup
@@ -230,6 +232,8 @@ npx eas-cli@latest build --profile development --platform android
 npx eas-cli@latest build --profile preview --platform android     # APK
 npx eas-cli@latest build --profile production --platform all      # AAB + IPA (iOS needs an Apple Developer account)
 ```
+
+The full release process (Play Console, closed testing, TestFlight, `eas submit` and the device test checklist) is in [RELEASE.md](./RELEASE.md).
 
 App identity: **Kadam**, bundle ID / package `com.hamzaameer.kadam`. The user-facing version (`1.0.0`) is set in `app.json`; build numbers (`versionCode` / `buildNumber`) are managed by EAS (`"appVersionSource": "remote"`) and go up automatically for each production build.
 
