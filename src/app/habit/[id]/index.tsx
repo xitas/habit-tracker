@@ -5,6 +5,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EntrySheet } from '@/components/EntrySheet';
+import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
 import { Heatmap } from '@/components/Heatmap';
 import { StreakTiles } from '@/components/StreakTiles';
 import { Button, Card, IconButton, SectionLabel } from '@/components/ui';
@@ -84,6 +85,7 @@ export default function HabitDetailScreen() {
   // Only this habit's entries: changes to other habits don't re-render this screen.
   const log = useStore((s) => s.entries[id] ?? EMPTY_LOG);
   const weekStartsOn = useStore((s) => s.settings.weekStartsOn);
+  const remindersBlocked = useRemindersBlocked();
 
   const [month, setMonth] = useState(() => {
     const d = fromKey(today);
@@ -154,6 +156,7 @@ export default function HabitDetailScreen() {
           </Text>
         </View>
       </View>
+      {habit.reminderTime && remindersBlocked ? <RemindersOffNote compact /> : null}
 
       <StreakTiles streaks={streaks} rate={rate30} />
 

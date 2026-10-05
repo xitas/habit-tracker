@@ -2,27 +2,27 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
 import { Card, ScreenHeader, Segmented, SectionLabel, ThemedSwitch, TimeStepper } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { exportCsv } from '@/lib/csv';
-import { ensurePermission, notificationsSupported, notificationsUnavailableReason } from '@/lib/notifications';
+import { askForReminders, notificationsUnavailableReason } from '@/lib/notifications';
+import { countEntries } from '@/lib/persistence/validate';
 import { getState, resetAll, updateSettings, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 
 export default function SettingsScreen() {
   const { c } = useTheme();
   const settings = useStore((s) => s.settings);
-  const entryCount = useStore((s) => Object.keys(s.entries).length);
+  const entryCount = useStore((s) => countEntries(s));
+  const remindersBlocked = useRemindersBlocked();
   const [message, setMessage] = useState<string | null>(null);
 
   const toggleReminders = async (on: boolean) => {
     updateSettings({ remindersEnabled: on });
-    if (on && notificationsSupported) {
-      const granted = await ensurePermission();
-      setMessage(granted ? null : 'Notifications are blocked. Enable them for this app in your phone’s settings.');
-    } else {
-      setMessage(null);
-    }
+    setMessage(null);
+    // Explains first, then asks; never re-asks after a denial (the note below covers that).
+    if (on) await askForReminders();
   };
 
   const doExport = async () => {
@@ -87,6 +87,7 @@ export default function SettingsScreen() {
               <TimeStepper value={settings.nudgeTime} onChange={(t) => updateSettings({ nudgeTime: t })} />
             </>
           ) : null}
+          {remindersBlocked ? <RemindersOffNote compact /> : null}
           {notificationsUnavailableReason ? (
             <Text style={[styles.help, { color: c.textMuted }]}>{notificationsUnavailableReason}</Text>
           ) : null}

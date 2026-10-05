@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { orderedWeekdays, WEEKDAY_SHORT } from '@/lib/dates';
-import { ensurePermission } from '@/lib/notifications';
+import { askForReminders } from '@/lib/notifications';
 import type { HabitDraft } from '@/lib/store';
 import { useStore } from '@/lib/store';
 import { alpha, HABIT_COLORS, HABIT_ICONS, radius, useTheme } from '@/lib/theme';
@@ -70,7 +70,7 @@ export function HabitForm({
         : freqKind === 'weekdays'
           ? { kind: 'weekdays', days }
           : { kind: 'timesPerWeek', count: perWeek };
-    if (reminderOn) ensurePermission().catch(() => {});
+    if (reminderOn) askForReminders().catch(() => {});
     onSubmit({
       name: name.trim(),
       icon: icon.trim() || '✅',

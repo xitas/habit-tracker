@@ -71,6 +71,9 @@ A mobile habit tracker app for building and tracking daily habits: simple to log
   - A weekly completion bar chart and your overall completion rate over the last 7, 30 or 90 days.
 - **Daily notes and backfilling:** tap any past day on a habit's calendar or history to mark it done, skipped or missed, or to add a short journal note.
 - **Local reminders and notifications:** each habit can remind you at its reminder time, and an optional evening nudge reminds you when habits are still open.
+  - Reminders are skipped for days already done or skipped, and for "X times per week" habits once the week's goal is met.
+  - Tapping a reminder opens that habit; tapping the evening nudge opens Today.
+  - Reminders are scheduled one day at a time for the next 7 days, at most 60 at once (iOS allows 64). The schedule refreshes when the app opens, on every change and at midnight.
 - **Light, Dark and System theme modes**, switchable instantly in Settings.
 - **Works offline with local storage.** No account or login is needed, and nothing leaves the device.
 - **CSV data export** through the share sheet, plus a "reset all data" option.

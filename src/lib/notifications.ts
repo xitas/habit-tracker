@@ -1,23 +1,18 @@
-// Local notifications: one reminder per habit at its reminder time, plus a
-// gentle evening nudge on days when habits are still open.
-//
-// Local notifications can't check app state when they fire, so the nudge is
-// scheduled per day and rescheduled whenever data changes: finishing all of
-// today's habits cancels today's nudge.
+// Reminders on the phone: connects the reminder engine (reminders/engine.ts) to
+// expo-notifications, the app's data, permission prompts and notification taps.
 
 import { isRunningInExpoGo } from 'expo';
+import { router } from 'expo-router';
 import type * as NotificationsModule from 'expo-notifications';
-import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { useEffect, useSyncExternalStore } from 'react';
+import { AppState, Linking, Platform } from 'react-native';
 
-import { addDays, fromKey, parseTime, todayKey } from './dates';
-import { dayTally } from './schedule';
+import { createReminderEngine, type NotificationApi, type PermissionStatus, type ReminderEngine } from './reminders/engine';
+import { routeForNotification } from './reminders/plan';
 import { getState, useStore } from './store';
-import type { AppData } from './types';
 import { useToday } from './useToday';
 
 const CHANNEL_ID = 'reminders';
-const NUDGE_DAYS = 7;
 // Expo Go on Android (SDK 53+) throws as soon as expo-notifications is imported,
 // so reminders there need a development build.
 const expoGoAndroid = Platform.OS === 'android' && isRunningInExpoGo();
@@ -28,131 +23,6 @@ const supported = (Platform.OS === 'ios' || Platform.OS === 'android') && !expoG
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Notifications: typeof NotificationsModule = supported ? require('expo-notifications') : null!;
 
-type Plan = { id: string; title: string; body: string; trigger: NotificationsModule.NotificationTriggerInput };
-
-let configured = false;
-function configure() {
-  if (configured || !supported) return;
-  configured = true;
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Habit reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
-    }).catch(() => {});
-  }
-}
-
-/** Ask for notification permission if we don't have it yet. Returns whether granted. */
-export async function ensurePermission(): Promise<boolean> {
-  if (!supported) return false;
-  configure();
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  if (!current.canAskAgain) return false;
-  const next = await Notifications.requestPermissionsAsync();
-  return next.granted;
-}
-
-function buildPlan(data: AppData, now: Date): Plan[] {
-  if (!data.settings.remindersEnabled) return [];
-  const plan: Plan[] = [];
-  const habits = data.habits.filter((h) => !h.archived);
-  const channel = Platform.OS === 'android' ? { channelId: CHANNEL_ID } : {};
-
-  for (const h of habits) {
-    if (!h.reminderTime) continue;
-    const { hour, minute } = parseTime(h.reminderTime);
-    const content = {
-      title: `${h.icon} ${h.name}`,
-      body: h.type === 'measurable' ? `Goal today: ${h.target} ${h.unit}` : 'Time for your habit',
-    };
-    if (h.frequency.kind === 'weekdays') {
-      for (const day of h.frequency.days) {
-        plan.push({
-          id: `habit-${h.id}-${day}`,
-          ...content,
-          // expo-notifications weekdays are 1 (Sunday) … 7 (Saturday).
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: day + 1, hour, minute, ...channel },
-        });
-      }
-    } else {
-      plan.push({
-        id: `habit-${h.id}`,
-        ...content,
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, ...channel },
-      });
-    }
-  }
-
-  const { hour, minute } = parseTime(data.settings.nudgeTime);
-  const today = todayKey();
-  for (let i = 0; i < NUDGE_DAYS; i++) {
-    const day = addDays(today, i);
-    const at = fromKey(day);
-    at.setHours(hour, minute, 0, 0);
-    if (at <= now) continue;
-    const tally = dayTally(habits, data.entries, day, data.settings.weekStartsOn);
-    const left = tally.expected - tally.done;
-    if (left <= 0) continue;
-    // Future days haven't been logged yet, so only today's count is meaningful.
-    const body =
-      i === 0
-        ? `${left} habit${left === 1 ? '' : 's'} still open today. There's still time 🌙`
-        : 'Some habits are still open today. There’s still time 🌙';
-    plan.push({
-      id: `nudge-${day}`,
-      title: 'Evening check-in',
-      body,
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, ...channel },
-    });
-  }
-  return plan;
-}
-
-async function apply(plan: Plan[]) {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  if (plan.length === 0) return;
-  const perm = await Notifications.getPermissionsAsync();
-  if (!perm.granted) return;
-  for (const p of plan) {
-    await Notifications.scheduleNotificationAsync({
-      identifier: p.id,
-      content: { title: p.title, body: p.body },
-      trigger: p.trigger,
-    });
-  }
-}
-
-/** Keeps scheduled notifications in sync with habits, settings and today's progress. */
-export function useNotificationSync(enabled: boolean) {
-  const habits = useStore((s) => s.habits);
-  const entries = useStore((s) => s.entries);
-  const settings = useStore((s) => s.settings);
-  const today = useToday();
-  const lastSignature = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!supported || !enabled) return;
-    configure();
-    const timer = setTimeout(() => {
-      const plan = buildPlan(getState(), new Date());
-      const signature = JSON.stringify(plan);
-      if (signature === lastSignature.current) return;
-      lastSignature.current = signature;
-      apply(plan).catch((err) => console.warn('Failed to schedule notifications', err));
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [enabled, habits, entries, settings, today]);
-}
-
 export const notificationsSupported = supported;
 
 /** Why reminders can't run here, or null when they can. */
@@ -161,3 +31,194 @@ export const notificationsUnavailableReason = supported
   : expoGoAndroid
     ? 'Reminders don’t work in Expo Go on Android. Use a development build (npx expo run:android) to get them.'
     : 'Notifications are only available in the phone app.';
+
+// ---- expo-notifications adapter ----
+
+function toStatus(p: NotificationsModule.NotificationPermissionsStatus): PermissionStatus {
+  if (Platform.OS === 'ios' && p.ios) {
+    // iOS: rely on ios.status. Provisional and ephemeral authorizations deliver notifications too.
+    const s = p.ios.status;
+    const S = Notifications.IosAuthorizationStatus;
+    if (s === S.AUTHORIZED || s === S.PROVISIONAL || s === S.EPHEMERAL) return 'granted';
+    return s === S.DENIED ? 'denied' : 'undetermined';
+  }
+  if (p.granted) return 'granted';
+  return p.status === 'denied' ? 'denied' : 'undetermined';
+}
+
+const expoApi: NotificationApi = {
+  async getPermission() {
+    return toStatus(await Notifications.getPermissionsAsync());
+  },
+  async requestPermission() {
+    return toStatus(await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } }));
+  },
+  async getScheduled() {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    return all.map((r) => {
+      const fp = (r.content.data as { fp?: unknown } | null)?.fp;
+      return { id: r.identifier, fingerprint: typeof fp === 'string' ? fp : null };
+    });
+  },
+  async schedule(item) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: item.id,
+      content: { title: item.title, body: item.body, data: { ...item.data, fp: item.fingerprint } },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: item.at,
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_ID } : {}),
+      },
+    });
+  },
+  cancel: (id) => Notifications.cancelScheduledNotificationAsync(id),
+};
+
+let engine: ReminderEngine | null = null;
+function getEngine(): ReminderEngine | null {
+  if (!supported) return null;
+  if (!engine) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+        name: 'Habit reminders',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      }).catch(() => {});
+    }
+    engine = createReminderEngine({ api: expoApi, getData: getState });
+  }
+  return engine;
+}
+
+// ---- Permission explanation (shown before the system prompt) ----
+
+type ExplainerState = { visible: boolean; resolve: ((ok: boolean) => void) | null };
+let explainer: ExplainerState = { visible: false, resolve: null };
+const explainerListeners = new Set<() => void>();
+const setExplainer = (next: ExplainerState) => {
+  explainer = next;
+  explainerListeners.forEach((l) => l());
+};
+const subscribeExplainer = (l: () => void) => {
+  explainerListeners.add(l);
+  return () => {
+    explainerListeners.delete(l);
+  };
+};
+
+/** State for the explanation sheet, and the function its buttons call. */
+export function useReminderExplainer() {
+  const state = useSyncExternalStore(subscribeExplainer, () => explainer, () => explainer);
+  return {
+    visible: state.visible,
+    answer(ok: boolean) {
+      state.resolve?.(ok);
+      setExplainer({ visible: false, resolve: null });
+    },
+  };
+}
+
+/**
+ * Turns reminders on: explains why, then shows the system prompt. Does nothing if
+ * permission is already granted, was denied (never re-asks), or the user chose
+ * "Not now" earlier in this session.
+ */
+export async function askForReminders(): Promise<PermissionStatus | 'unavailable'> {
+  const e = getEngine();
+  if (!e) return 'unavailable';
+  return e.askWithExplanation(() => new Promise<boolean>((resolve) => setExplainer({ visible: true, resolve })));
+}
+
+const subscribeEngine = (l: () => void) => getEngine()?.subscribe(l) ?? (() => {});
+
+/** Notification permission: 'granted' | 'denied' | 'undetermined', or null before the first check / when unsupported. */
+export function useReminderPermission(): PermissionStatus | null {
+  return useSyncExternalStore(
+    subscribeEngine,
+    () => getEngine()?.getStatus().permission ?? null,
+    () => null,
+  );
+}
+
+/** Opens this app's page in the phone's Settings, where notifications can be turned on. */
+export function openAppSettings() {
+  Linking.openSettings().catch(() => {});
+}
+
+// ---- Keeping the schedule in sync ----
+
+/**
+ * Keeps scheduled reminders equal to the plan: on launch, whenever habits,
+ * entries or settings change, at midnight, and when the app comes back to the
+ * foreground (also re-checking permission then).
+ */
+export function useReminderSync(enabled: boolean) {
+  const habits = useStore((s) => s.habits);
+  const entries = useStore((s) => s.entries);
+  const settings = useStore((s) => s.settings);
+  const today = useToday(); // changes at midnight
+
+  // Launch and foreground: re-check permission (it may have been changed in Settings) and refresh.
+  useEffect(() => {
+    const e = getEngine();
+    if (!e || !enabled) return;
+    void e.refreshPermission().then(() => e.requestSync());
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void e.refreshPermission().then(() => e.requestSync());
+    });
+    return () => sub.remove();
+  }, [enabled]);
+
+  // Every change and midnight: cancel reminders that are no longer needed right away
+  // (e.g. the habit was just completed), then reconcile the rest.
+  useEffect(() => {
+    const e = getEngine();
+    if (!e || !enabled) return;
+    const timer = setTimeout(() => void e.cancelNoLongerNeeded(), 150);
+    return () => clearTimeout(timer);
+  }, [enabled, habits, entries, settings, today]);
+}
+
+// ---- Notification taps ----
+
+const handledResponses = new Set<string>();
+
+/**
+ * Opens the right screen when a notification is tapped: the habit's detail for a
+ * habit reminder, Today for the evening nudge. Covers taps that launch the app
+ * from closed, bring it back from the background, or arrive while it's open.
+ * Call once the app is ready (data loaded, navigator mounted).
+ */
+export function useNotificationTaps(ready: boolean) {
+  useEffect(() => {
+    if (!supported || !ready) return;
+    getEngine();
+    const handle = (response: NotificationsModule.NotificationResponse) => {
+      const key = `${response.notification.request.identifier}|${response.notification.date}|${response.actionIdentifier}`;
+      if (handledResponses.has(key)) return; // the launch tap can be reported twice
+      handledResponses.add(key);
+      router.navigate(routeForNotification(response.notification.request.content.data, getState().habits) as never);
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    };
+    let active = true;
+    // A tap that launched the app from closed.
+    Notifications.getLastNotificationResponseAsync()
+      .then((r) => {
+        if (active && r) handle(r);
+      })
+      .catch(() => {});
+    // Taps while running (foreground or background).
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, [ready]);
+}

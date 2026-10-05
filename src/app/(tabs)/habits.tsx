@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
 import { Fab, ScreenHeader, SectionLabel } from '@/components/ui';
 import { formatTime } from '@/lib/dates';
 import { computeStreaks, frequencyLabel, type Streaks } from '@/lib/schedule';
@@ -14,12 +15,12 @@ import { useToday } from '@/lib/useToday';
 type Row = { kind: 'habit'; habit: Habit } | { kind: 'archived-toggle'; count: number };
 
 /** One habit row. Memoized: re-renders only when its habit or streak changes. */
-const HabitRow = memo(function HabitRow({ habit: h, streak }: { habit: Habit; streak: Streaks }) {
+const HabitRow = memo(function HabitRow({ habit: h, streak, blocked }: { habit: Habit; streak: Streaks; blocked: boolean }) {
   const { c, tag } = useTheme();
   const details = [
     frequencyLabel(h),
     h.type === 'measurable' ? `${h.target} ${h.unit}` : null,
-    h.reminderTime ? `🔔 ${formatTime(h.reminderTime)}` : null,
+    h.reminderTime ? `${blocked ? '🔕' : '🔔'} ${formatTime(h.reminderTime)}` : null,
   ].filter(Boolean);
   return (
     <Pressable
@@ -59,6 +60,8 @@ export default function HabitsScreen() {
   const entries = useStore((s) => s.entries);
   const weekStartsOn = useStore((s) => s.settings.weekStartsOn);
   const [showArchived, setShowArchived] = useState(false);
+  const remindersBlocked = useRemindersBlocked();
+  const anyReminders = habits.some((h) => !h.archived && h.reminderTime);
 
   const active = useMemo(() => habits.filter((h) => !h.archived), [habits]);
   const archived = useMemo(() => habits.filter((h) => h.archived), [habits]);
@@ -85,11 +88,11 @@ export default function HabitsScreen() {
       const streak = computeStreaks(item.habit, logOf(entries, item.habit.id), today, weekStartsOn);
       return (
         <View style={styles.content}>
-          <HabitRow habit={item.habit} streak={streak} />
+          <HabitRow habit={item.habit} streak={streak} blocked={remindersBlocked} />
         </View>
       );
     },
-    [entries, today, weekStartsOn, showArchived, c.textMuted],
+    [entries, today, weekStartsOn, showArchived, c.textMuted, remindersBlocked],
   );
 
   return (
@@ -98,7 +101,16 @@ export default function HabitsScreen() {
         data={rows}
         keyExtractor={(r) => (r.kind === 'habit' ? r.habit.id : 'archived-toggle')}
         renderItem={renderRow}
-        ListHeaderComponent={<ScreenHeader title="Habits" subtitle={`${active.length} active`} />}
+        ListHeaderComponent={
+          <>
+            <ScreenHeader title="Habits" subtitle={`${active.length} active`} />
+            {remindersBlocked && anyReminders ? (
+              <View style={styles.content}>
+                <RemindersOffNote compact />
+              </View>
+            ) : null}
+          </>
+        }
         ListEmptyComponent={
           <Text style={[styles.empty, { color: c.textMuted }]}>No active habits. Tap + to create one.</Text>
         }

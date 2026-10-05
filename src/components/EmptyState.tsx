@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { askForReminders } from '@/lib/notifications';
 import { addHabit, type HabitDraft } from '@/lib/store';
 import { alpha, HABIT_COLORS, radius, shadow, useTheme } from '@/lib/theme';
 import { Button } from './ui';
@@ -57,7 +58,10 @@ export function SuggestionList({ suggestions }: { suggestions: typeof SUGGESTED_
           key={draft.name}
           accessibilityRole="button"
           accessibilityLabel={`Add ${draft.name}, ${blurb}`}
-          onPress={() => addHabit(draft)}
+          onPress={() => {
+            addHabit(draft);
+            if (draft.reminderTime) askForReminders().catch(() => {});
+          }}
           style={({ pressed }) => [
             styles.suggestion,
             { backgroundColor: c.surface, opacity: pressed ? 0.85 : 1 },

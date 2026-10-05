@@ -8,9 +8,10 @@ import { Appearance, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { RecoveryScreen } from '@/components/RecoveryScreen';
+import { ReminderPermissionSheet } from '@/components/ReminderPermissionSheet';
 import { SaveErrorBanner } from '@/components/SaveErrorBanner';
 import { ThemeFade } from '@/components/ThemeFade';
-import { useNotificationSync } from '@/lib/notifications';
+import { useNotificationTaps, useReminderSync } from '@/lib/notifications';
 import { hydrate, useHydrated, useLoadStatus, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 
@@ -19,12 +20,13 @@ import { useTheme } from '@/lib/theme';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /**
- * Keeps reminders in sync. It subscribes to every entry change, so it lives in
- * its own component: a tap re-renders only this (it renders nothing), not the
- * root layout and the navigator tree below it.
+ * Keeps reminders in sync and routes notification taps. It subscribes to every
+ * entry change, so it lives in its own component: a tap re-renders only this (it
+ * renders nothing), not the root layout and the navigator tree below it.
  */
 function NotificationSync({ enabled }: { enabled: boolean }) {
-  useNotificationSync(enabled);
+  useReminderSync(enabled);
+  useNotificationTaps(enabled);
   return null;
 }
 
@@ -99,6 +101,7 @@ export default function RootLayout() {
           <Stack.Screen name="habit/[id]/edit" options={{ presentation: 'modal', title: 'Edit habit' }} />
         </Stack>
         <NotificationSync enabled={hydrated} />
+        <ReminderPermissionSheet />
         <SaveErrorBanner />
         <ThemeFade />
       </ThemeProvider>
