@@ -6,7 +6,7 @@ import { orderedWeekdays, WEEKDAY_LETTER, WEEKDAY_LONG } from '@/lib/dates';
 import { askForReminders } from '@/lib/notifications';
 import type { HabitDraft } from '@/lib/store';
 import { useStore } from '@/lib/store';
-import { alpha, HABIT_COLORS, HABIT_ICONS, radius, useTheme } from '@/lib/theme';
+import { alpha, colorName, HABIT_COLORS, HABIT_ICONS, radius, useTheme } from '@/lib/theme';
 import type { Frequency, HabitType, Weekday } from '@/lib/types';
 import { Button, Card, Chip, Emoji, FONT_CAPS, IconButton, MIN_TOUCH, Segmented, SectionLabel, ThemedSwitch, TimeStepper, useInputTheme, useLargeText } from './ui';
 
@@ -145,7 +145,7 @@ export function HabitForm({
               key={col}
               onPress={() => setColor(col)}
               accessibilityRole="button"
-              accessibilityLabel={`Color ${col}`}
+              accessibilityLabel={colorName(col)}
               accessibilityState={{ selected: color === col }}
               style={[styles.swatchHit, { width: `${100 / swatchesPerRow}%` }]}
             >

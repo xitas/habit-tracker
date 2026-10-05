@@ -42,6 +42,8 @@ export interface Settings {
   nudgeTime: string;
   /** Color theme; 'system' follows the phone's setting. */
   theme: 'system' | 'light' | 'dark';
+  /** When the user last exported a backup (ISO timestamp), for the gentle reminder in Settings. */
+  lastBackupAt: string | null;
 }
 
 /** One habit's entries, keyed by date. Treated as immutable: a change replaces the object. */

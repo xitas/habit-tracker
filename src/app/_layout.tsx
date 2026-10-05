@@ -7,11 +7,13 @@ import { useEffect, useMemo } from 'react';
 import { Appearance, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { DialogHost } from '@/components/DialogHost';
 import { RecoveryScreen } from '@/components/RecoveryScreen';
 import { ReminderPermissionSheet } from '@/components/ReminderPermissionSheet';
 import { SaveErrorBanner } from '@/components/SaveErrorBanner';
 import { FONT_CAPS } from '@/components/ui';
 import { ThemeFade } from '@/components/ThemeFade';
+import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { useNotificationTaps, useReminderSync } from '@/lib/notifications';
 import { hydrate, useHydrated, useLoadStatus, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
@@ -115,6 +117,8 @@ export default function RootLayout() {
         <NotificationSync enabled={hydrated} />
         <ReminderPermissionSheet />
         <SaveErrorBanner />
+        <UndoSnackbar />
+        <DialogHost />
         <ThemeFade />
       </ThemeProvider>
     </GestureHandlerRootView>

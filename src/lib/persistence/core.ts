@@ -9,7 +9,8 @@
 // - Destructive recovery actions first save a copy of everything readable, and
 //   move to a new database file instead of deleting the old one.
 
-import { entryKey, logOf, serialize, type AppData, type Entry, type EntryStatus, type Habit, type Settings } from '../types';
+import { createBackup } from '../backup';
+import { entryKey, logOf, serialize, type AppData, type Entry, type EntryStatus, type Habit, type HabitLog, type Settings } from '../types';
 import { LATEST_SCHEMA_VERSION, META_KEYS } from './schema';
 import type { Backend, PersistenceEnv } from './types';
 import { countEntries, describeError, emptyData, parseAppData } from './validate';
@@ -455,6 +456,61 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     put(habit.id, date, v, s, note.trim() || undefined);
   }
 
+  // ---- Undo ----
+
+  /** Puts one day back exactly as it was (`null` = no entry), e.g. to undo a completion. */
+  function restoreEntry(habitId: string, date: string, entry: Entry | null) {
+    if (!canWrite('undo')) return;
+    writeEntry(habitId, date, entry ? { ...entry } : null);
+  }
+
+  /** Undoes a delete: the habit, all its entries and its place in the list come back. */
+  function restoreDeletedHabit(habit: Habit, log: HabitLog, index: number) {
+    if (!canWrite('undo delete')) return;
+    if (state.habits.some((h) => h.id === habit.id)) return;
+    const habits = [...state.habits];
+    habits.splice(Math.min(Math.max(index, 0), habits.length), 0, habit);
+    commit({ ...state, habits, entries: { ...state.entries, [habit.id]: log } });
+    const order = habits.map((h) => h.id);
+    // A failure here is retried as a full rewrite from memory (the "reset" path), which restores everything.
+    persist('undo delete', { reset: true }, (b) => b.insertHabitAt(habit, Object.values(log), order));
+  }
+
+  // ---- Restore / import ----
+
+  /**
+   * Replaces all data (restore from a backup, CSV import). First saves a backup of
+   * the current data in the app's files; if that fails, nothing is replaced. The
+   * replacement itself is one verified transaction, so it's all-or-nothing.
+   */
+  async function replaceAllData(next: AppData, label: string): Promise<ActionResult> {
+    if (!canWrite(label)) return { ok: false, message: 'Your data isn’t loaded, so nothing was changed.' };
+    const b = backend!;
+    // Keep this device's "last backup" time; the incoming data's value is older.
+    const incoming: AppData = { ...next, settings: { ...next.settings, lastBackupAt: state.settings.lastBackupAt } };
+    const job = writes.then(async () => {
+      const safety = createBackup(state, { appVersion: 'automatic', now: env.now() });
+      const where = await env.files.write(`backups/before-${label}-${stamp().replace(/[:.]/g, '-')}.json`, safety.content);
+      await b.replaceAll(incoming);
+      return where;
+    });
+    writes = job.then(
+      () => {},
+      () => {},
+    );
+    try {
+      const where = await job;
+      clearUnsaved();
+      state = incoming;
+      setStatus({ saveError: null, unsavedChanges: 0 });
+      backupWrite = saveBackup(incoming);
+      return { ok: true, message: where };
+    } catch (err) {
+      log(`Couldn't ${label}`, err);
+      return { ok: false, message: `${describeError(err)}. Nothing was changed.` };
+    }
+  }
+
   function updateSettings(patch: Partial<Settings>) {
     if (!canWrite('update settings')) return;
     commit({ ...state, settings: { ...state.settings, ...patch } });
@@ -492,6 +548,10 @@ export function createAppStore(env: PersistenceEnv, log: (msg: string, err?: unk
     },
     // Recovery
     retry,
+    // Undo, restore and import
+    restoreEntry,
+    restoreDeletedHabit,
+    replaceAllData,
     retrySaves,
     restoreBackup,
     startFresh,

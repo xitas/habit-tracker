@@ -68,6 +68,14 @@ export const HABIT_COLORS = [
   '#2D9CDB', '#E8B931', '#EC6FAE',
 ];
 
+/** Spoken names for the habit colors, in the same order (for screen readers). */
+export const HABIT_COLOR_NAMES = ['Indigo', 'Green', 'Orange', 'Red', 'Purple', 'Blue', 'Yellow', 'Pink'];
+
+export function colorName(hex: string): string {
+  const i = HABIT_COLORS.findIndex((c) => c.toLowerCase() === hex.toLowerCase());
+  return i >= 0 ? HABIT_COLOR_NAMES[i] : 'Custom color';
+}
+
 export const HABIT_ICONS = [
   '💧', '📚', '🧘', '🏃', '💪', '🥗', '😴', '✍️',
   '🎸', '🧹', '💊', '🚶', '🌱', '☀️', '📵', '🧠',

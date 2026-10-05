@@ -53,6 +53,18 @@ CREATE TABLE settings (
 
 export const LATEST_SCHEMA_VERSION = SCHEMA_MIGRATIONS[SCHEMA_MIGRATIONS.length - 1].version;
 
+/**
+ * Upgrades for exported data (backup files), keyed by the version they upgrade
+ * FROM. Every schema version that changes the data's shape must add one here,
+ * next to its SQL migration, so backups made by older versions keep restoring.
+ *
+ * Version 0 is the original, pre-SQLite format (one JSON document in
+ * AsyncStorage); its data has the same shape as version 1.
+ */
+export const DATA_MIGRATIONS: Record<number, (data: unknown) => unknown> = {
+  0: (data) => data,
+};
+
 export const META_KEYS = {
   schemaVersion: 'schema_version',
   legacyMigratedAt: 'legacy_migrated_at',

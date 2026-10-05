@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   remindersEnabled: true,
   nudgeTime: '20:00',
   theme: 'system',
+  lastBackupAt: null,
 };
 
 export const emptyData = (): AppData => ({
@@ -108,6 +109,8 @@ export function normalizeSettings(x: unknown): Settings {
     remindersEnabled: typeof s.remindersEnabled === 'boolean' ? s.remindersEnabled : DEFAULT_SETTINGS.remindersEnabled,
     nudgeTime: typeof s.nudgeTime === 'string' && TIME.test(s.nudgeTime) ? s.nudgeTime : DEFAULT_SETTINGS.nudgeTime,
     theme: s.theme === 'light' || s.theme === 'dark' || s.theme === 'system' ? s.theme : DEFAULT_SETTINGS.theme,
+    lastBackupAt:
+      typeof s.lastBackupAt === 'string' && !Number.isNaN(Date.parse(s.lastBackupAt)) ? s.lastBackupAt : DEFAULT_SETTINGS.lastBackupAt,
   };
 }
 

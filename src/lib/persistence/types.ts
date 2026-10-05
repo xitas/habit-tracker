@@ -51,6 +51,11 @@ export interface Backend {
   putHabit(habit: Habit): Promise<void>;
   /** Deletes a habit and its entries in one transaction. */
   deleteHabit(id: string): Promise<void>;
+  /**
+   * Puts a deleted habit back with its entries, at its old position: `order` is
+   * the full list of habit ids in display order. One transaction (used by undo).
+   */
+  insertHabitAt(habit: Habit, entries: Entry[], order: string[]): Promise<void>;
   putEntry(entry: Entry): Promise<void>;
   deleteEntry(habitId: string, date: string): Promise<void>;
   putSettings(patch: Partial<Settings>): Promise<void>;

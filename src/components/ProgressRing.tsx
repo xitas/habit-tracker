@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
+import { useMotion } from '@/lib/motion';
 import { useTheme } from '@/lib/theme';
 import { FONT_CAPS } from './ui';
 
@@ -24,11 +25,14 @@ export function ProgressRing({
   const { c } = useTheme();
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
-  const p = useSharedValue(0);
+  const { animateRing } = useMotion();
+  const p = useSharedValue(animateRing ? 0 : progress);
 
   useEffect(() => {
-    p.value = withTiming(Math.max(0, Math.min(1, progress)), { duration: 600, easing: Easing.out(Easing.cubic) });
-  }, [progress, p]);
+    const target = Math.max(0, Math.min(1, progress));
+    // Reduce motion: the ring jumps to its new value instead of sweeping.
+    p.value = animateRing ? withTiming(target, { duration: 600, easing: Easing.out(Easing.cubic) }) : target;
+  }, [progress, p, animateRing]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - p.value),

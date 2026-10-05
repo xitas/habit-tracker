@@ -1,20 +1,23 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RemindersOffNote, useRemindersBlocked } from '@/components/RemindersOffNote';
 import { Card, ScreenHeader, Segmented, SectionLabel, ThemedSwitch, TimeStepper, useLargeText } from '@/components/ui';
-import { confirm } from '@/lib/confirm';
+import { lastBackupText } from '@/lib/backup';
 import { exportCsv } from '@/lib/csv';
+import { backUpNow, confirmReset, startCsvImport, startRestore } from '@/lib/dataTransfer';
 import { askForReminders, notificationsUnavailableReason } from '@/lib/notifications';
 import { countEntries } from '@/lib/persistence/validate';
-import { getState, resetAll, updateSettings, useStore } from '@/lib/store';
+import { getState, updateSettings, useStore } from '@/lib/store';
+import { useToday } from '@/lib/useToday';
 import { useTheme } from '@/lib/theme';
 
 export default function SettingsScreen() {
   const { c } = useTheme();
   const settings = useStore((s) => s.settings);
   const entryCount = useStore((s) => countEntries(s));
+  useToday(); // re-render at midnight so "Last backup: N days ago" stays right
   const remindersBlocked = useRemindersBlocked();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -31,6 +34,15 @@ export default function SettingsScreen() {
       setMessage(null);
     } catch (err) {
       setMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const doBackup = async () => {
+    try {
+      await backUpNow();
+      setMessage(null);
+    } catch (err) {
+      setMessage(`Backup failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -95,25 +107,30 @@ export default function SettingsScreen() {
 
         <SectionLabel>Data</SectionLabel>
         <Card style={{ paddingVertical: 4 }}>
+          <Row
+            icon="cloud-upload-outline"
+            label="Back up data"
+            detail={lastBackupText(settings.lastBackupAt, new Date())}
+            onPress={doBackup}
+          />
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <Row icon="cloud-download-outline" label="Restore from backup" onPress={() => void startRestore()} />
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
           <Row icon="download-outline" label="Export data as CSV" detail={`${entryCount} entries`} onPress={doExport} />
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <Row icon="document-text-outline" label="Import CSV" onPress={() => void startCsvImport()} />
           <View style={[styles.divider, { backgroundColor: c.border }]} />
           <Row
             icon="trash-outline"
             label="Reset all data"
             danger
-            onPress={() =>
-              confirm(
-                'Reset all data?',
-                'This permanently deletes every habit, entry and note on this device. Consider exporting first.',
-                'Reset',
-                () => {
-                  resetAll();
-                  setMessage('All data has been reset.');
-                },
-              )
-            }
+            onPress={() => confirmReset(() => setMessage('All data has been reset.'))}
           />
         </Card>
+        <Text style={[styles.help, styles.dataNote, { color: c.textMuted }]}>
+          A backup is one file with all habits, entries, notes and settings. Keep it somewhere safe, like your
+          cloud drive, to move to a new phone.
+        </Text>
 
         {message ? <Text style={[styles.message, { color: c.textMuted }]}>{message}</Text> : null}
 
@@ -132,7 +149,7 @@ function Row({
   danger,
   onPress,
 }: {
-  icon: 'download-outline' | 'trash-outline';
+  icon: ComponentProps<typeof Ionicons>['name'];
   label: string;
   detail?: string;
   danger?: boolean;
@@ -146,6 +163,7 @@ function Row({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={detail ? `${label}, ${detail}` : label}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
     >
       <Ionicons name={icon} size={22} color={color} />
@@ -168,4 +186,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   message: { fontSize: 14, textAlign: 'center', marginTop: 16, lineHeight: 20 },
   footer: { fontSize: 13, textAlign: 'center', marginTop: 28 },
+  dataNote: { marginTop: 8, marginHorizontal: 4, lineHeight: 18 },
 });

@@ -99,6 +99,15 @@ export class KvBackend implements Backend {
     await this.save();
   }
 
+  async insertHabitAt(habit: Habit, entries: Entry[], order: string[]): Promise<void> {
+    const d = this.current.data;
+    const byId = new Map(d.habits.map((h) => [h.id, h]));
+    byId.set(habit.id, { ...habit });
+    d.habits = order.map((id) => byId.get(id)).filter((h): h is Habit => !!h);
+    d.entries = { ...d.entries, [habit.id]: Object.fromEntries(entries.map((e) => [e.date, { ...e }])) };
+    await this.save();
+  }
+
   async deleteHabit(id: string): Promise<void> {
     const d = this.current.data;
     d.habits = d.habits.filter((h) => h.id !== id);

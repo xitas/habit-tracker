@@ -10,6 +10,16 @@ import { FONT_CAPS, IconButton } from './ui';
 /** Accent strength for partial days, by thirds of the target. */
 const PARTIAL_LEVELS = [0.3, 0.5, 0.7];
 
+const STATE_TEXT: Record<DayState, string> = {
+  done: 'done',
+  partial: 'partly done',
+  skipped: 'skipped',
+  missed: 'missed',
+  open: 'not logged yet',
+  off: 'not scheduled',
+  future: 'upcoming',
+};
+
 type Props = {
   habit: Habit;
   /** This habit's entries by date. */
@@ -84,21 +94,34 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
           const bg = fill(state, date);
           const filled = state === 'done' || state === 'partial';
           const ink = filled ? onColor(bg) : state === 'future' ? c.textFaint : c.textMuted;
-          const hasNote = !!log[date]?.note;
+          const entry = log[date];
+          const hasNote = !!entry?.note;
           const disabled = !onDayPress || state === 'future';
+          // "3 October, partly done, 3 of 8 glasses, has a note"
+          const label = [
+            `${Number(date.slice(8))} ${MONTHS[month]}${date === today ? ', today' : ''}`,
+            STATE_TEXT[state],
+            habit.type === 'measurable' && entry && entry.value > 0 ? `${entry.value} of ${habit.target} ${habit.unit}`.trim() : null,
+            hasNote ? 'has a note' : null,
+          ]
+            .filter(Boolean)
+            .join(', ');
           return (
             <Pressable
               key={date}
               disabled={disabled}
               onPress={() => onDayPress?.(date)}
               accessibilityRole={disabled ? undefined : 'button'}
-              accessibilityLabel={`${date}: ${state === 'open' ? 'not logged' : state === 'off' ? 'not scheduled' : state}`}
+              accessibilityLabel={label}
+              accessibilityState={{ selected: selected === date, disabled }}
               style={styles.cell}
             >
               <View
                 style={[
                   styles.square,
                   { backgroundColor: bg },
+                  // Shapes as well as colors, so states don't depend on telling colors apart.
+                  state === 'off' && { borderWidth: 1, borderColor: c.border, borderStyle: 'dotted' },
                   state === 'skipped' && { borderWidth: 1.5, borderColor: c.warningText, borderStyle: 'dashed' },
                   date === today && state !== 'done' && { borderWidth: 2, borderColor: c.accent },
                   selected === date && { borderWidth: 2, borderColor: c.text },
@@ -107,6 +130,7 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
                 <Text maxFontSizeMultiplier={FONT_CAPS.grid} style={[styles.dayNum, { color: ink }]}>
                   {Number(date.slice(8))}
                 </Text>
+                {state === 'missed' ? <View style={[styles.missedMark, { backgroundColor: c.dangerText }]} /> : null}
                 {hasNote ? <View style={[styles.noteDot, { backgroundColor: ink }]} /> : null}
               </View>
             </Pressable>
@@ -121,7 +145,18 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
           swatch={<View style={[styles.legendSq, { borderWidth: 1.5, borderColor: c.warningText, borderStyle: 'dashed' }]} />}
           label="Skipped"
         />
-        <Legend swatch={<View style={[styles.legendSq, { backgroundColor: c.surfaceAlt }]} />} label="Missed" />
+        <Legend
+          swatch={
+            <View style={[styles.legendSq, styles.legendCenter, { backgroundColor: c.surfaceAlt }]}>
+              <View style={[styles.legendMark, { backgroundColor: c.dangerText }]} />
+            </View>
+          }
+          label="Missed"
+        />
+        <Legend
+          swatch={<View style={[styles.legendSq, { borderWidth: 1, borderColor: c.border, borderStyle: 'dotted' }]} />}
+          label="Not scheduled"
+        />
       </View>
     </View>
   );
@@ -130,7 +165,7 @@ export function Heatmap({ habit, log, year, month, today, weekStartsOn, selected
 function Legend({ swatch, label }: { swatch: ReactNode; label: string }) {
   const { c } = useTheme();
   return (
-    <View style={styles.legendItem}>
+    <View style={styles.legendItem} accessible accessibilityLabel={`Legend: ${label}`}>
       {swatch}
       <Text style={{ color: c.textMuted, fontSize: 12 }}>{label}</Text>
     </View>
@@ -140,13 +175,17 @@ function Legend({ swatch, label }: { swatch: ReactNode; label: string }) {
 const styles = StyleSheet.create({
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   month: { fontSize: 16, fontWeight: '700' },
-  row: { flexDirection: 'row' },
+  // The grid reaches 6px into the card's padding so each day gets a 44px touch target at 360px wide.
+  row: { flexDirection: 'row', marginHorizontal: -6 },
   weekday: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, padding: 2.5 },
   square: { flex: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   dayNum: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   noteDot: { position: 'absolute', bottom: 4, width: 4, height: 4, borderRadius: 2 },
+  missedMark: { position: 'absolute', top: 5, width: 10, height: 2.5, borderRadius: 1.25 },
+  legendCenter: { alignItems: 'center', justifyContent: 'center' },
+  legendMark: { width: 7, height: 2, borderRadius: 1 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 12, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendSq: { width: 12, height: 12, borderRadius: 3 },

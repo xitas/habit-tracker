@@ -11,9 +11,10 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { Card, FAB_CLEARANCE, Fab, ScreenHeader, SectionLabel, useLargeText } from '@/components/ui';
 import { formatLong } from '@/lib/dates';
 import { computeStreaks, dayTally, frequencyLabel, getEntry, isDueOn, weeklyRemaining } from '@/lib/schedule';
-import { clearStatus, getState, markDone, markSkipped, setValue, useStore } from '@/lib/store';
+import { clearStatus, getState, markDone, markSkipped, restoreEntry, setValue, useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 import { logOf, type Entry, type Habit } from '@/lib/types';
+import { describeEntryChange, offerUndo } from '@/lib/undo';
 import { useToday } from '@/lib/useToday';
 
 const haptic = (kind: 'light' | 'success') => {
@@ -69,39 +70,48 @@ export default function TodayScreen() {
   // Stable handlers: they read the latest entry when called instead of closing over `entries`,
   // so every card gets the same functions and unchanged cards skip re-rendering.
   const current = useCallback((h: Habit) => getEntry(getState().entries, h.id, today), [today]);
-  const complete = useCallback(
-    (h: Habit) => {
-      if (current(h)?.status === 'done') return;
-      markDone(h, today);
-      haptic('light');
+  /** Runs a change to today's entry and, if it completed, skipped or cleared the habit, offers an undo. */
+  const undoable = useCallback(
+    (h: Habit, change: () => void) => {
+      const prev = current(h);
+      change();
+      const what = describeEntryChange(prev, current(h));
+      if (what) offerUndo(`${what}: ${h.name}`, () => restoreEntry(h.id, today, prev ?? null));
     },
     [current, today],
   );
+  const complete = useCallback(
+    (h: Habit) => {
+      if (current(h)?.status === 'done') return;
+      undoable(h, () => markDone(h, today));
+      haptic('light');
+    },
+    [current, undoable, today],
+  );
   const skip = useCallback(
     (h: Habit) => {
-      if (current(h)?.status === 'skipped') clearStatus(h, today);
-      else markSkipped(h, today);
+      undoable(h, () => (current(h)?.status === 'skipped' ? clearStatus(h, today) : markSkipped(h, today)));
     },
-    [current, today],
+    [current, undoable, today],
   );
   const step = useCallback(
     (h: Habit, delta: number) => {
       const e = current(h);
       const next = (e?.status === 'skipped' ? 0 : (e?.value ?? 0)) + delta;
-      setValue(h, today, next);
+      undoable(h, () => setValue(h, today, next));
       if (next >= h.target && (e?.value ?? 0) < h.target) haptic('light');
     },
-    [current, today],
+    [current, undoable, today],
   );
   const tap = useCallback(
     (h: Habit) => {
       const e = current(h);
-      if (e?.status === 'skipped') return clearStatus(h, today);
+      if (e?.status === 'skipped') return undoable(h, () => clearStatus(h, today));
       if (h.type === 'measurable') return step(h, stepFor(h.target));
-      if (e?.status === 'done') return clearStatus(h, today);
+      if (e?.status === 'done') return undoable(h, () => clearStatus(h, today));
       complete(h);
     },
-    [current, today, step, complete],
+    [current, undoable, today, step, complete],
   );
   const openSheet = useCallback((h: Habit) => setSheetHabit(h), []);
 
@@ -196,6 +206,9 @@ export default function TodayScreen() {
               <Text
                 key={h.id}
                 onPress={() => router.push(`/habit/${h.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`${h.name}, not due today, ${h.frequency.kind === 'timesPerWeek' ? 'weekly goal met' : frequencyLabel(h)}`}
+                accessibilityHint="Opens the habit’s details"
                 style={[
                   styles.notDue,
                   { color: c.textMuted, borderTopColor: c.border, borderTopWidth: i ? StyleSheet.hairlineWidth : 0 },

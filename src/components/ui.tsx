@@ -35,6 +35,16 @@ export function useFontScale(): number {
   return Math.max(fontScale, root / 16);
 }
 
+/**
+ * Height of the bottom tab bar. Its labels scale with the phone's text size up to
+ * FONT_CAPS.grid (four fixed-width columns), and the bar grows with them instead of clipping.
+ */
+export function useTabBarHeight(): { height: number; bottomInset: number } {
+  const insets = useSafeAreaInsets();
+  const labelLine = Math.ceil(15 * Math.min(useFontScale(), FONT_CAPS.grid));
+  return { height: 55 + labelLine + insets.bottom, bottomInset: insets.bottom };
+}
+
 /** True when the text size is large enough that side-by-side layouts should stack. */
 export function useLargeText(): boolean {
   return useFontScale() >= 1.5;

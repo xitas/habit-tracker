@@ -64,7 +64,8 @@ A mobile habit tracker app for building and tracking daily habits: simple to log
   - A progress ring shows how much of today's list is done.
   - Habits appear as large, one-handed cards: tap to check off, use **+ / −** for measurable habits, or long-press to enter a value or a note.
   - Swipe **right** to complete and **left** to skip. Skipped days are excused, not failed.
-  - Confetti plays when everything for the day is done.
+  - Confetti plays when everything for the day is done (a still "All done" badge instead when the phone's Reduce Motion setting is on).
+  - Completing, skipping or clearing a habit shows an **Undo** bar for a few seconds. Archiving and deleting a habit can be undone the same way.
 - **Streaks and stats**
   - Each habit shows its current and best streak. Streaks respect the habit's schedule, so a Mon/Wed/Fri habit isn't broken by Tuesday.
   - Each habit has a monthly calendar heatmap.
@@ -76,7 +77,10 @@ A mobile habit tracker app for building and tracking daily habits: simple to log
   - Reminders are scheduled one day at a time for the next 7 days, at most 60 at once (iOS allows 64). The schedule refreshes when the app opens, on every change and at midnight.
 - **Light, Dark and System theme modes**, switchable instantly in Settings.
 - **Works offline with local storage.** No account or login is needed, and nothing leaves the device.
-- **CSV data export** through the share sheet, plus a "reset all data" option.
+- **Backup and restore:** Settings → *Back up data* saves everything (habits, entries, notes, settings) as one JSON file; *Restore from backup* checks the file, shows what's in it, and saves a copy of your current data before replacing it. Backups from older app versions are upgraded; files from newer versions are refused.
+- **CSV export and import:** export every entry as CSV, and import that format back, adding to your data or replacing it. Rows that can't be imported are listed with the reason.
+- **Reset all data**, with the option to back up first.
+- **Accessibility:** screen-reader labels throughout (calendar days read as "3 October, done"), Complete/Skip actions on habit cards, 44 × 44 touch targets, large-text support, Reduce Motion support, and calendar states that don't rely on color alone.
 - **Other settings:** the week can start on Monday or Sunday, and habits can be archived, restored or deleted.
 
 ## Tech Stack
@@ -91,7 +95,7 @@ A mobile habit tracker app for building and tracking daily habits: simple to log
 | Animations and gestures | `react-native-reanimated`, `react-native-worklets`, `react-native-gesture-handler` |
 | Graphics | `react-native-svg` (progress ring), `@expo/vector-icons` (Ionicons) |
 | Notifications | `expo-notifications` (local, scheduled) |
-| Export | `expo-file-system`, `expo-sharing` |
+| Export and import | `expo-file-system`, `expo-sharing`, `expo-document-picker` |
 | Platform polish | `expo-haptics`, `expo-splash-screen`, `expo-system-ui`, `expo-status-bar` |
 | Web preview | `react-native-web`, `react-dom` |
 | Tooling | ESLint (`eslint-config-expo`), `tsx` (runs the tests) |
@@ -147,7 +151,8 @@ npm run web       # Browser preview (no notifications or haptics)
 ### Checks
 
 ```bash
-npm test            # streak logic (incl. equivalence with the original code), storage and theme tests
+npm test            # streak logic (incl. equivalence with the original code), storage, theme,
+                    # reminders, backup/restore, CSV import and undo tests
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
 npm run bench       # performance benchmark (30 habits × 2 years)
@@ -166,7 +171,8 @@ habit-tracker/
     │   └── habit/        # New habit (modal), habit detail, edit habit
     ├── components/       # UI: habit card, progress ring, heatmap, charts, forms, sheets
     └── lib/              # Logic: data types, store, scheduling/streaks, notifications,
-                          # CSV export, theme tokens, date helpers (+ tests)
+                          # backup/restore, CSV export/import, undo, theme tokens,
+                          # date helpers (+ tests)
 ```
 
 ## Data Model
@@ -231,7 +237,6 @@ npx expo export --platform web
 - 📱 Home screen widgets for checking off habits
 - 🗂️ Habit categories and filtering
 - 🏆 Achievements and milestone badges
-- 📥 CSV import to restore exported data
 
 ## Contributing
 

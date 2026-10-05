@@ -168,7 +168,7 @@ export function createReminderEngine(options: EngineOptions) {
    * then queues a full sync. Safe to call on every change.
    */
   async function cancelNoLongerNeeded(): Promise<void> {
-    if (appliedIds.size === 0) return void requestSync();
+    if (appliedIds.size === 0) return requestSync();
     const plan = buildReminderPlan(getData(), now());
     const keep = new Set(plan.items.map((i) => i.id));
     const gone = [...appliedIds].filter((id) => !keep.has(id));

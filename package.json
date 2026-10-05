@@ -9,6 +9,7 @@
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",
     "expo-dev-client": "~57.0.19",
+    "expo-document-picker": "~57.0.3",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
@@ -44,7 +45,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/lib/schedule.test.ts && tsx src/lib/tokens.test.ts && tsx src/lib/reminders/reminders.test.ts && tsx src/lib/persistence/persistence.test.ts && tsx src/lib/schedule.equivalence.test.ts",
+    "test": "tsx src/lib/schedule.test.ts && tsx src/lib/tokens.test.ts && tsx src/lib/reminders/reminders.test.ts && tsx src/lib/persistence/persistence.test.ts && tsx src/lib/schedule.equivalence.test.ts && tsx src/lib/features.test.ts",
     "lint": "expo lint",
     "bench": "tsx scripts/benchmark.ts"
   },

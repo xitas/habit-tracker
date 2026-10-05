@@ -12,9 +12,10 @@ import { Button, Card, Emoji, FONT_CAPS, IconButton, SectionLabel, useLargeText 
 import { confirm } from '@/lib/confirm';
 import { addDays, formatLong, formatTime, fromKey } from '@/lib/dates';
 import { computeStreaks, dayState, frequencyLabel, habitStart, habitTally, rate, type DayState } from '@/lib/schedule';
-import { deleteHabit, updateHabit, useStore } from '@/lib/store';
+import { deleteHabit, getState, restoreDeletedHabit, updateHabit, useStore } from '@/lib/store';
 import { alpha, radius, useTheme } from '@/lib/theme';
 import { EMPTY_LOG, type Entry, type Habit } from '@/lib/types';
+import { offerUndo } from '@/lib/undo';
 import { useToday } from '@/lib/useToday';
 
 const PAGE = 30;
@@ -207,7 +208,9 @@ export default function HabitDetailScreen() {
           variant="secondary"
           icon={habit.archived ? 'arrow-undo-outline' : 'archive-outline'}
           onPress={() => {
+            const previous = habit;
             updateHabit(habit.id, { archived: !habit.archived });
+            offerUndo(`${habit.archived ? 'Restored' : 'Archived'}: ${habit.name}`, () => updateHabit(previous.id, previous));
             if (!habit.archived) router.back();
           }}
         />
@@ -221,8 +224,12 @@ export default function HabitDetailScreen() {
               'This removes the habit and its entire history. Archive it instead to keep the history.',
               'Delete',
               () => {
+                // Everything needed to put it back exactly: the habit, its history and its place in the list.
+                const index = getState().habits.findIndex((h) => h.id === habit.id);
+                const history = getState().entries[habit.id] ?? EMPTY_LOG;
                 router.back();
                 deleteHabit(habit.id);
+                offerUndo(`Deleted: ${habit.name}`, () => restoreDeletedHabit(habit, history, index));
               },
             )
           }

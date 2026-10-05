@@ -183,6 +183,27 @@ export class SqliteBackend implements Backend {
     );
   }
 
+  async insertHabitAt(habit: Habit, entries: Entry[], order: string[]): Promise<void> {
+    const db = this.conn;
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO habits (${HABIT_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        habitParams(habit, order.indexOf(habit.id)),
+      );
+      for (let i = 0; i < entries.length; i += ENTRIES_PER_BATCH) {
+        const batch = entries.slice(i, i + ENTRIES_PER_BATCH);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO entries (habit_id, date, value, status, note) VALUES ${batch.map(() => '(?,?,?,?,?)').join(',')}`,
+          batch.flatMap(entryParams),
+        );
+      }
+      // Renumber so the list order matches exactly what's on screen.
+      for (let i = 0; i < order.length; i++) {
+        await db.runAsync('UPDATE habits SET sort_order = ? WHERE id = ?', [i, order[i]]);
+      }
+    });
+  }
+
   async deleteHabit(id: string): Promise<void> {
     const db = this.conn;
     await db.withTransactionAsync(async () => {

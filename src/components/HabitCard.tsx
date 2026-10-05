@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useMotion } from '@/lib/motion';
 import { alpha, radius, shadow, useTheme } from '@/lib/theme';
 import type { Entry, Habit } from '@/lib/types';
 import { Emoji, IconButton, MIN_TOUCH } from './ui';
@@ -74,6 +75,7 @@ export const HabitCard = memo(function HabitCard({
   const skipped = entry?.status === 'skipped';
   const value = entry?.value ?? 0;
   const measurable = habit.type === 'measurable';
+  const { checkPop } = useMotion();
 
   const tx = useSharedValue(0);
   const pop = useSharedValue(1);
@@ -82,11 +84,11 @@ export const HabitCard = memo(function HabitCard({
 
   // Check-mark pop when the habit flips to done.
   useEffect(() => {
-    if (done && !wasDone.current) {
+    if (done && !wasDone.current && checkPop) {
       pop.value = withSequence(withTiming(0.6, { duration: 80 }), withSpring(1.15, { damping: 6 }), withSpring(1));
     }
     wasDone.current = done;
-  }, [done, pop]);
+  }, [done, pop, checkPop]);
 
   const pan = Gesture.Pan()
     .activeOffsetX([-14, 14])
@@ -138,7 +140,22 @@ export const HabitCard = memo(function HabitCard({
             delayLongPress={350}
             accessibilityRole="button"
             accessibilityLabel={`${habit.name}, ${a11yState}. ${measurable ? `${progressText}. ` : ''}${subtitle}`}
-            accessibilityHint="Swipe right to complete, left to skip. Long press for details and notes."
+            accessibilityHint={
+              measurable
+                ? 'Double tap to add one step. Actions: complete, skip, details.'
+                : `Double tap to ${done ? 'mark not done' : 'complete'}. Actions: complete, skip, details.`
+            }
+            // Screen-reader actions (swipe up/down on Android, rotor on iPhone) instead of the swipe gestures.
+            accessibilityActions={[
+              ...(done ? [] : [{ name: 'complete', label: 'Complete' }]),
+              { name: 'skip', label: skipped ? 'Unskip' : 'Skip' },
+              { name: 'longpress', label: 'Details and notes' },
+            ]}
+            onAccessibilityAction={(e) => {
+              if (e.nativeEvent.actionName === 'complete') complete();
+              else if (e.nativeEvent.actionName === 'skip') skip();
+              else if (e.nativeEvent.actionName === 'longpress') onLongPress(habit);
+            }}
             style={styles.row}
           >
             <View style={[styles.icon, { backgroundColor: alpha(color, 0.15) }, skipped && { opacity: 0.5 }]}>

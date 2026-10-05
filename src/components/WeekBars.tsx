@@ -63,7 +63,10 @@ export function WeekBars({
               style={styles.col}
               onPress={() => setPicked(isPicked ? null : d.date)}
               accessibilityRole="button"
-              accessibilityLabel={`${formatLong(d.date)}: ${d.expected ? `${Math.round(pct * 100)} percent` : 'nothing due'}`}
+              accessibilityLabel={`${formatLong(d.date)}, ${
+                d.future ? 'upcoming' : d.expected ? `${d.done} of ${d.expected} done, ${Math.round(pct * 100)} percent` : 'nothing due'
+              }`}
+              accessibilityState={{ selected: isPicked }}
             >
               <View style={styles.barArea}>
                 <View style={[styles.track, { backgroundColor: c.surfaceAlt }]} />
@@ -103,11 +106,12 @@ const styles = StyleSheet.create({
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 16, fontWeight: '700' },
   readout: { fontSize: 13, textAlign: 'center', marginVertical: 8, minHeight: 18 },
-  chart: { flexDirection: 'row', height: CHART_HEIGHT, borderBottomWidth: StyleSheet.hairlineWidth },
+  // Columns reach 6px into the card's padding so each bar is a 44px-wide touch target at 360px.
+  chart: { flexDirection: 'row', height: CHART_HEIGHT, borderBottomWidth: StyleSheet.hairlineWidth, marginHorizontal: -6 },
   col: { flex: 1, alignItems: 'center' },
   barArea: { width: 22, height: '100%', justifyContent: 'flex-end' },
   track: { ...StyleSheet.absoluteFill, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   bar: { width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  labels: { flexDirection: 'row', marginTop: 6 },
+  labels: { flexDirection: 'row', marginTop: 6, marginHorizontal: -6 },
   dayLabel: { flex: 1, textAlign: 'center', fontSize: 12 },
 });
